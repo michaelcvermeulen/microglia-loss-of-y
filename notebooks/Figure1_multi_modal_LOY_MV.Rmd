@@ -13,8 +13,9 @@ library(Signac)
 library(Biobase)
 library(GEOquery)
 library(ggpubr)
+library(Repitools)
 library(tidyverse)
-library(scibetR)
+library(dittoSeq)
 library(harmony)
 library(viridis)
 library(tibble)
@@ -33,158 +34,66 @@ source('H:/LOY/scLOY/scLOY/data_raw/build_data_files.R')
 source("E:/LOY/scLOY/scripts/annotation_functions.R")
 ```
 
-## R Markdown
+```{r load_data}
 
-```{r input_data}
-
-Read10X_h5("e:/LOY/scLOY/data/10X_MULTIOME_LYMPH/lymph_node_lymphoma_14k_filtered_feature_bc_matrix.h5") -> h5
-
-```
-
-## Preprocess
-
-```{r preprocess, echo=FALSE}
-h5$`Gene Expression` -> expr
-
-CreateSeuratObject(counts = expr, min.cells = 10, min.features = 200 ) -> o
-o[["percent.mt"]] <- PercentageFeatureSet(o, pattern = "^MT-")
-NormalizeData(o) -> o
-
-o@meta.data$donor_organism.sex <- "male"
-LOY_genes_to_exclude_expr(o) -> remove
-call_LOY(s_obj = o, genes_to_exclude = remove) -> o
-
-subset(o, nCount_RNA > 1000 & nFeature_RNA > 800) -> o
-
-h5$Peaks -> peaks
-
-grange.counts <- StringToGRanges(rownames(peaks), sep = c(":", "-"))
-grange.use <- seqnames(grange.counts) %in% standardChromosomes(grange.counts)
-peaks <- peaks[as.vector(grange.use), ]
-annotations <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
-seqlevelsStyle(annotations) <- 'UCSC'
-genome(annotations) <- "hg38"
-
-peaks[grepl(x = rownames(peaks), pattern = "chrY"),] %>% colSums() -> chrY
-
-dplyr::left_join( x = tibble::rownames_to_column(o@meta.data,"CB"),
-                  y = tibble::rownames_to_column(as.data.frame(chrY),"CB") ,
-                  by = "CB") %>% tibble::column_to_rownames("CB") -> o@meta.data
-
-o@meta.data %>% group_by(LOY) %>% summarise(median = median(chrY))
-
-chrom_assay <- Signac::CreateChromatinAssay(
-  counts = peaks,
-  sep = c(":", "-"),
-  genome = 'hg38',
-  fragments = 'e:/LOY/scLOY/data/10X_MULTIOME_LYMPH/lymph_node_lymphoma_14k_atac_fragments.tsv.gz',
-  annotation = annotations
-)
-
-colnames(chrom_assay)[colnames(chrom_assay) %in% colnames(o)] -> keep
-
-subset(chrom_assay, cells = keep ) -> chrom_assay
-subset(o, cells = keep) -> o
-
-o[["ATAC"]] <- chrom_assay
-
-dplyr::mutate(o@meta.data, chrY_ratio_ATAC = chrY/nCount_ATAC) -> o@meta.data
-
-ifelse(o@meta.data$LOY == "LOY" & o@meta.data$chrY == 0, "LOY", "NORMAL") -> o@meta.data$multimodal_LOY
-
-FindMarkers(subset(o, nCount_RNA > 1500), ident.1 = "LOY", ident.2 = "NORMAL", group.by = "multimodal_LOY")
-
-
-DefaultAssay(o) <- "ATAC"
-o <- NucleosomeSignal(o)
-o <- TSSEnrichment(o)
-
-
-VlnPlot(
-  object = o,
-  features = c("nCount_RNA", "nCount_ATAC", "TSS.enrichment", "nucleosome_signal"),
-  ncol = 4,
-  pt.size = 0
-)
-
-o <- subset(
-  x = o,
-  subset = nCount_ATAC < 100000 &
-    nCount_RNA < 20000 &
-    nCount_ATAC > 1000 &
-    nCount_RNA > 1000 &
-    nucleosome_signal < 1.5 &
-    TSS.enrichment > 1
-)
-
-
-
-
-
-
-
-DefaultAssay(o) <- "RNA"
-
-o@meta.data$cell_ident_MV <- o@meta.data$RNA_snn_res.0.1
-levels(o@meta.data$cell_ident_MV)[levels(o@meta.data$cell_ident_MV)%in%c(2)] <- "Myeloid"
-levels(o@meta.data$cell_ident_MV)[levels(o@meta.data$cell_ident_MV)%in%c(1)] <- "B tumor"
-levels(o@meta.data$cell_ident_MV)[levels(o@meta.data$cell_ident_MV)%in%c(6)] <- "pDC"
-levels(o@meta.data$cell_ident_MV)[levels(o@meta.data$cell_ident_MV)%in%c(5)] <- "Stromal"
-levels(o@meta.data$cell_ident_MV)[levels(o@meta.data$cell_ident_MV)%in%c(3)] <- "Cycling T"
-levels(o@meta.data$cell_ident_MV)[levels(o@meta.data$cell_ident_MV)%in%c(0)] <- "T"
-levels(o@meta.data$cell_ident_MV)[levels(o@meta.data$cell_ident_MV)%in%c(4)] <- "B"
-DimPlot(o, group.by = "cell_ident_MV", label = T)
-
-```
-
-```{r load_processed}
-# Have this processed file hosted for download if possible
-# The above pre-processing can be included in a different file
 readRDS("e:/LOY/scLOY/data/10X_MULTIOME_LYMPH/seurat_MV.RDS") -> o
 
 
-## ADD gene activity scores
-
-o[["ATAC_gene_activity"]]@data -> data
-data %>% as.matrix() -> data
-data[rownames(data) %in% expressed_Y_genes(o),] -> Y_counts
-Y_counts %>% colMeans() %>% as.data.frame() -> Y
-names(Y) <- "Norm_Access"
-left_join(x = tibble::rownames_to_column(o@meta.data,"CB"), y = tibble::rownames_to_column(Y,"CB"), by = "CB" ) %>%
-  tibble::column_to_rownames("CB") -> o@meta.data
 ```
 
+## Multi-modal LOY analysis (Fig 1)
 
-## Analysis (Fig 1)
+Expression-based classification of LOY agrees with ATAC-seq in the same nuclei.
+
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 ### Fig 1A
 
+UMAP plot showing clustering of nuclei using expression only.
+
 ```{r analysis_fig1a}
+
 
 ######## UMAPS #######
 dittoSeq::dittoDimPlot(object = o, var = "cell_ident_MV", size = 0.5,
-                       do.label = T, labels.size = 2) %>% ggpar(title = "") + Seurat::NoAxes()
+                       do.label = T, labels.size = 3) %>% ggpar(title = "", legend = "none") + Seurat::NoAxes() -> p
+
+
+p
+
+ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/CELL_TYPE_UMAP.pdf",
+       dpi = "retina", width = 4, height = 4, units = "in")
+
 
 ```
 
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 ### Fig 1B
+
 ```{r analysis_fig1b}
 
 
 factor(o@meta.data$cell_ident_MV,
        levels = rev(c("B tumor","B","T","Cycling T","Myeloid","pDC","Stromal"))) -> o@meta.data$cell_ident_MV
 
-# 3C53A4
+# 
 DotPlot(object = o, dot.scale = 13, features = rev(c("CEMIP","CLEC4C","CD14","CD163","MKI67",
                                  "CD3E","TRAC","CD8A","CD4",
                                  "BANK1","MS4A1",
                                  "PAX5","GPM6A")), group.by = "cell_ident_MV", cols = c("white","#3C53A4")) %>%
-                                    ggpar(x.text.angle = 45, font.xtickslab = c(12,"bold"), 
-                                          ylab = "", xlab ="Genes") 
+                                    ggpar(x.text.angle = 45, font.xtickslab = c(15,"bold"), 
+                                          font.ytickslab = c(17,"bold"),
+                                          ylab = "", xlab ="Genes") -> p 
+
+p
+
+#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/DOTPLOT.pdf",
+#       dpi = "retina", width = 7.74, height = 5, units = "in")
 
 ```
 
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 ### Fig 1C
 
@@ -192,10 +101,12 @@ DotPlot(object = o, dot.scale = 13, features = rev(c("CEMIP","CLEC4C","CD14","CD
 
 dittoSeq::dittoDimPlot(object = o, var = "LOY", do.label = F, size = 0.4,
                        color.panel = c("red","grey"),
-                       order = c("decreasing")) %>% ggpar(title = "") + NoAxes() 
+                       order = c("decreasing")) %>% ggpar(title = "", legend = "none") + NoAxes() -> p
+
+#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_UMAP.pdf",
+#       dpi = "retina", width = 3, height = 3, units = "in")
 
 ```
-
 
 ### Fig 1D
 
@@ -203,10 +114,15 @@ dittoSeq::dittoDimPlot(object = o, var = "LOY", do.label = F, size = 0.4,
 
 dittoSeq::dittoBarPlot(object = o, group.by = "cell_ident_MV", var = "LOY",
                        color.panel = c("grey","red"), var.labels.reorder = c(2,1)) -> p
-p %>% ggpar(title = "", xlab = "Cell type", legend = "bottom") 
+p %>% ggpar(title = "", xlab = "Cell type", legend = "none", ylab = "Proportion of cells",
+            font.xtickslab = c(12,"bold"), font.ytickslab = c(12), font.y = c(12), font.x = c(12)) -> p
+
+#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
+#       dpi = "retina", width = 4, height = 4, units = "in")
 
 ```
 
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 ### Fig 1G
 
@@ -215,9 +131,10 @@ p %>% ggpar(title = "", xlab = "Cell type", legend = "bottom")
 
 ```
 
-
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 ### Fig 1F
+
 ```{r}
 
 # inset boxplot (left)
@@ -272,3 +189,91 @@ ggdensity(data = o@meta.data[o@meta.data$nCount_RNA > 1000 & o@meta.data$cell_id
 
 ```
 
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+### SUPP FIG 2
+
+Supplementary Fig. 2 \| Y chromosome ATAC gene activity is exclusively repressed in LOY nuclei. Boxplots comparing LOY and non-LOY/normal nuclei chromatin accessibility-based gene activity across all chromosomes (n=9,380). Gene activity scores were calculated using genes with \> 0.2 normalized expression across all nuclei from the chromosome of interest. Boxes represent the 25th percentile, median, and 75th percentile. The whiskers extend to the furthest value that is no more than 1.5 times the inter-quartile range. LOY was classified using expression.
+
+```{r S2}
+
+DefaultAssay(o) <- "RNA"
+o[["ATAC_gene_activity"]]@data -> data
+data %>% as.matrix() -> data
+edb <- EnsDb.Hsapiens.v86
+
+## only use genes that are expressed
+AverageExpression(o, group.by = "orig.ident") -> t
+t$RNA[t$RNA > 1.090402e-02,] %>% names() -> elig
+
+
+lapply(c(1:22,"X","Y"), function(i){
+  message(i)
+  edb.x <- addFilter(edb, SeqNameFilter(i))
+  genes(edb.x) -> tmp
+  Repitools::annoGR2DF(tmp) -> tmp
+  AverageExpression(subset(o, nCount_RNA > 3000), features = tmp$gene_name) -> dat
+
+  dat$ATAC_gene_activity[rownames(dat$ATAC_gene_activity) %in% elig,] %>% 
+    as.data.frame() -> k
+
+  k$chr <- i
+  return(k)
+
+}) -> output
+data.table::rbindlist(output) -> output
+
+reshape2::melt(output, id = "chr" ) -> output
+
+ggpubr::ggboxplot(output, x = "chr", y = "value", 
+                  fill = "variable", outlier.shape = NA,
+                  palette = c("red","grey")) + ylim(0,0.75) -> p
+                  p %>% ggpar(xlab = "", ylab = "Gene activity (ATAC-seq)", 
+                  legend = "none", font.xtickslab = c(8,"bold")) -> p
+
+#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
+#       dpi = "retina", width = 4, height = 4, units = "in")
+
+```
+
+
+
+### SUPP FIG 3
+```{r S3}
+
+#### S3A
+Idents(o) <- "LOY"
+DefaultAssay(o) <- "ATAC"
+p1 <- CoveragePlot(
+  object = subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000), tile = F,
+  region = "UTY",
+  features = "UTY", window = 2000,
+  expression.assay = "RNA",
+  extend.upstream = 1000,
+  extend.downstream = 500
+)
+
+#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
+#       dpi = "retina", width = 4, height = 4, units = "in")
+
+
+
+#### S3B
+Idents(o) <- "LOY"
+DefaultAssay(o) <- "ATAC"
+p2 <- CoveragePlot(
+  object = subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000), tile = F,
+  region = "ZFY",
+  features = "ZFY", window = 2000,
+  expression.assay = "RNA",
+  extend.upstream = 100000,
+  extend.downstream = 500
+)
+
+#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
+#       dpi = "retina", width = 4, height = 4, units = "in")
+
+
+
+
+```
