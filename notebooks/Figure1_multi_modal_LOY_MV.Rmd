@@ -35,7 +35,8 @@ source("E:/LOY/scLOY/scripts/annotation_functions.R")
 ## Multi-modal LOY analysis (Fig 1)
 
 Expression-based classification of LOY agrees with ATAC-seq in the same nuclei.\
-Pre-processing completed using the Processing_multi_modal.R script which is largely based off of this vignette.
+Pre-processing completed using the Processing_multi_modal.R script which is largely based off of this vignette: 
+https://satijalab.org/signac/articles/pbmc_vignette.html
 
 ```{r load_data}
 
