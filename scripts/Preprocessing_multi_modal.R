@@ -8,14 +8,12 @@ library(Biobase)
 library(GEOquery)
 library(ggpubr)
 library(tidyverse)
-library(scibetR)
 library(harmony)
 library(viridis)
 library(tibble)
 library(reshape2)
 library(scDblFinder)
-library(SingleR)
-library(celldex)
+suppressPackageStartupMessages(library(BSgenome.Hsapiens.UCSC.hg38))
 suppressPackageStartupMessages(library(EnsDb.Hsapiens.v86))
 edb <- EnsDb.Hsapiens.v86
 
@@ -38,7 +36,7 @@ frag <- "e:/LOY/scLOY/data/10X_MULTIOME_LYMPH/lymph_node_lymphoma_14k_atac_fragm
 h5$`Gene Expression` -> expr
 CreateSeuratObject(counts = expr, min.cells = 10, min.features = 200 ) -> o
 o[["percent.mt"]] <- PercentageFeatureSet(o, pattern = "^MT-")
-NormalizeData(o) -> o
+NormalizeData(o) -> o   # Seurat normalize the exp mat
 
 # This sample is a male, all cells are male
 o@meta.data$donor_organism.sex <- "male"
@@ -69,6 +67,8 @@ dplyr::left_join( x = tibble::rownames_to_column(o@meta.data,"CB"),
 
 o@meta.data %>% group_by(LOY) %>% summarise(median = median(chrY))
 
+
+# Create Chromatin assay
 chrom_assay <- Signac::CreateChromatinAssay(
   counts = peaks,
   sep = c(":", "-"),
@@ -76,12 +76,6 @@ chrom_assay <- Signac::CreateChromatinAssay(
   fragments = frag,
   annotation = annotations
 )
-
-#o$blacklist_fraction <- FractionCountsInRegion(
-#  object = o,
-#  assay = 'peaks',
-#  regions = blacklist_hg38_unified
-#)
 
 colnames(chrom_assay)[colnames(chrom_assay) %in% colnames(o)] -> keep
 
@@ -92,15 +86,13 @@ o[["ATAC"]] <- chrom_assay
 
 dplyr::mutate(o@meta.data, chrY_ratio_ATAC = chrY/nCount_ATAC) -> o@meta.data
 
+# combine ATAC and GEX measures of LOY 
 ifelse(o@meta.data$LOY == "LOY" & o@meta.data$chrY == 0, "LOY", "NORMAL") -> o@meta.data$multimodal_LOY
-
-FindMarkers(subset(o, nCount_RNA > 1500), ident.1 = "LOY", ident.2 = "NORMAL", group.by = "multimodal_LOY")
 
 
 DefaultAssay(o) <- "ATAC"
 o <- NucleosomeSignal(o)
 o <- TSSEnrichment(o)
-
 
 VlnPlot(
   object = o,
@@ -118,9 +110,6 @@ o <- subset(
     nucleosome_signal < 1.5 &
     TSS.enrichment > 1
 )
-
-### install MACS3
-
 
 # RNA analysis
 DefaultAssay(o) <- "RNA"
@@ -149,12 +138,13 @@ Seurat::AddModuleScore(object = o, features = P, name = "PAR_score") -> o
 list(Y_scLOY_genes$gene_name[Y_scLOY_genes$gene_name %in% rownames(o)]) -> Y
 Seurat::AddModuleScore(object = o, features = Y, name = "Y_score") -> o
 
-# Scale data and run PCA
+# Scale data and run PCA - Seurat workflow
 o <- Seurat::ScaleData(o, vars.to.regress = c("nCount_RNA","percent.mt","percent.rb"))
 v <- Seurat::VariableFeatures(o)
-v <- v[!(v %in% c(ribo,mito,male_genes,"XIST","JPX"))]
+v <- v[!(v %in% c(ribo,mito))]  # remove  
 o <- Seurat::RunPCA(o, npcs = 50, features = v, assay = "RNA")
 ElbowPlot(o, ndims = 50)
+
 
 o <- Seurat::RunUMAP(o,reduction = "pca", dims = 1:20)
 o <- Seurat::FindNeighbors(o,reduction = "pca", dims = 1:20)
@@ -162,12 +152,8 @@ o <- Seurat::FindClusters(o,resolution = 0.1)
 DimPlot(o, group.by = "RNA_snn_res.0.1", label = T)
 Idents(o) <- "RNA_snn_res.0.1"
 
-FindMarkers(o, ident.1 = 1, ident.2 = NULL, group.by = "RNA_snn_res.0.1")
-
 DimPlot(subset(o, nCount_RNA > 1500), group.by = "LOY")
 
-FindMarkers(subset(o, nCount_RNA > 1500 & nFeature_RNA >= 1000 & RNA_snn_res.0.1 == 1), group.by = "LOY",
-            ident.1 = "LOY", ident.2 = "NORMAL", test.use = "MAST", latent.vars = c("nCount_RNA","nFeature_RNA","percent.rb"))
 
 # ATAC analysis
 # We exclude the first dimension as this is typically correlated with sequencing depth
@@ -177,7 +163,11 @@ o <- FindTopFeatures(o, min.cutoff = "q25")
 o <- RunSVD(o)
 o <- RunUMAP(o, reduction = 'lsi', dims = 2:50, reduction.name = "umap.atac", reduction.key = "atacUMAP_")
 
-library(BSgenome.Hsapiens.UCSC.hg38)
+DimPlot(o, group.by = "RNA_snn_res.0.1", label = T)
+DimPlot(o, group.by = "LOY", label = T)
+
+# find activity scores for each gene
+
 o <- RegionStats(o, genome = BSgenome.Hsapiens.UCSC.hg38)
 
 gene.activities <- GeneActivity(o)

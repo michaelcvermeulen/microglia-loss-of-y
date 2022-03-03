@@ -1,11 +1,11 @@
 ---
-title: "Figure1"
+title: "Figure1-microglia-loss-of-y"
 author: "Mike Vermeulen"
 date: '2022-03-02'
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup_packages, include=FALSE}
 library(Seurat)
 library(magrittr)
 library(data.table)
@@ -21,8 +21,6 @@ library(viridis)
 library(tibble)
 library(reshape2)
 library(scDblFinder)
-library(SingleR)
-library(celldex)
 suppressPackageStartupMessages(library(EnsDb.Hsapiens.v86))
 edb <- EnsDb.Hsapiens.v86
 
@@ -34,6 +32,11 @@ source('H:/LOY/scLOY/scLOY/data_raw/build_data_files.R')
 source("E:/LOY/scLOY/scripts/annotation_functions.R")
 ```
 
+## Multi-modal LOY analysis (Fig 1)
+
+Expression-based classification of LOY agrees with ATAC-seq in the same nuclei.\
+Pre-processing completed using the Processing_multi_modal.R script which is largely based off of this vignette.
+
 ```{r load_data}
 
 readRDS("e:/LOY/scLOY/data/10X_MULTIOME_LYMPH/seurat_MV.RDS") -> o
@@ -41,9 +44,21 @@ readRDS("e:/LOY/scLOY/data/10X_MULTIOME_LYMPH/seurat_MV.RDS") -> o
 
 ```
 
-## Multi-modal LOY analysis (Fig 1)
+```{r preprocessing}
 
-Expression-based classification of LOY agrees with ATAC-seq in the same nuclei.
+DefaultAssay(o) <- "RNA"
+o[["ATAC_gene_activity"]]@data -> data
+data %>% as.matrix() -> data
+data[rownames(data) %in% expressed_Y_genes(o),] -> Y_counts
+Y_counts %>% colMeans() %>% as.data.frame() -> Y
+names(Y) <- "Norm_Access"
+left_join(x = tibble::rownames_to_column(o@meta.data,"CB"), y = tibble::rownames_to_column(Y,"CB"), by = "CB" ) %>%
+  tibble::column_to_rownames("CB") -> o@meta.data
+
+
+ifelse(o@meta.data$Norm_Access==0, yes = "LOY", no = "NORMAL") -> o@meta.data$ATAC_LOY
+
+```
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
@@ -51,11 +66,11 @@ Expression-based classification of LOY agrees with ATAC-seq in the same nuclei.
 
 UMAP plot showing clustering of nuclei using expression only.
 
-```{r analysis_fig1a}
+```{r fig1a}
 
 
 ######## UMAPS #######
-dittoSeq::dittoDimPlot(object = o, var = "cell_ident_MV", size = 0.5,
+dittoSeq::dittoDimPlot(object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000), var = "cell_ident_MV", size = 0.5,
                        do.label = T, labels.size = 3) %>% ggpar(title = "", legend = "none") + Seurat::NoAxes() -> p
 
 
@@ -65,20 +80,34 @@ ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/
        dpi = "retina", width = 4, height = 4, units = "in")
 
 
+dittoSeq::dittoDimPlot(object = subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000), 
+                       var = "cell_ident_MV", size = 0.8,
+                       do.label = T, labels.size = 3) %>% ggpar(title = "", legend = "none") + Seurat::NoAxes() -> p
+
+
+p
+
+ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/CELL_TYPE_UMAP3000.pdf",
+       dpi = "retina", width = 4, height = 4, units = "in")
+
+
 ```
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 ### Fig 1B
 
-```{r analysis_fig1b}
+DotPlot describing the clusters.
+
+```{r fig1b}
 
 
 factor(o@meta.data$cell_ident_MV,
        levels = rev(c("B tumor","B","T","Cycling T","Myeloid","pDC","Stromal"))) -> o@meta.data$cell_ident_MV
 
 # 
-DotPlot(object = o, dot.scale = 13, features = rev(c("CEMIP","CLEC4C","CD14","CD163","MKI67",
+DotPlot(object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000),
+        dot.scale = 12, features = rev(c("CEMIP","CLEC4C","CD14","CD163","MKI67",
                                  "CD3E","TRAC","CD8A","CD4",
                                  "BANK1","MS4A1",
                                  "PAX5","GPM6A")), group.by = "cell_ident_MV", cols = c("white","#3C53A4")) %>%
@@ -88,8 +117,8 @@ DotPlot(object = o, dot.scale = 13, features = rev(c("CEMIP","CLEC4C","CD14","CD
 
 p
 
-#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/DOTPLOT.pdf",
-#       dpi = "retina", width = 7.74, height = 5, units = "in")
+ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/DOTPLOT.pdf",
+       dpi = "retina", width = 7.74, height = 5, units = "in")
 
 ```
 
@@ -97,28 +126,147 @@ p
 
 ### Fig 1C
 
-```{r analysis_fig1c}
+```{r fig1c}
 
-dittoSeq::dittoDimPlot(object = o, var = "LOY", do.label = F, size = 0.4,
+
+### 3000 
+dittoSeq::dittoDimPlot(object = subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000), 
+                       var = "LOY", do.label = F, size = 0.4,
                        color.panel = c("red","grey"),
                        order = c("decreasing")) %>% ggpar(title = "", legend = "none") + NoAxes() -> p
 
-#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_UMAP.pdf",
-#       dpi = "retina", width = 3, height = 3, units = "in")
+ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_UMAP_3000UMI.pdf",
+       dpi = "retina", width = 3, height = 3, units = "in")
+
+
+### 1500
+dittoSeq::dittoDimPlot(object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000), 
+                       var = "LOY", do.label = F, size = 0.4,
+                       color.panel = c("red","grey"),
+                       order = c("decreasing")) %>% ggpar(title = "", legend = "none") + NoAxes() -> p
+
+ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_UMAP.pdf",
+       dpi = "retina", width = 3, height = 3, units = "in")
 
 ```
+
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 ### Fig 1D
 
 ```{r analysis_fig1d}
 
-dittoSeq::dittoBarPlot(object = o, group.by = "cell_ident_MV", var = "LOY",
+### Using GEX
+dittoSeq::dittoBarPlot(object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000), group.by = "cell_ident_MV", var = "LOY",
                        color.panel = c("grey","red"), var.labels.reorder = c(2,1)) -> p
 p %>% ggpar(title = "", xlab = "Cell type", legend = "none", ylab = "Proportion of cells",
             font.xtickslab = c(12,"bold"), font.ytickslab = c(12), font.y = c(12), font.x = c(12)) -> p
 
-#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
-#       dpi = "retina", width = 4, height = 4, units = "in")
+reshape2::dcast(data = p$data, formula = grouping ~ label)
+
+ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
+       dpi = "retina", width = 4, height = 4, units = "in")
+
+
+dittoSeq::dittoBarPlot(object = subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000), 
+                       group.by = "cell_ident_MV", var = "LOY",
+                       color.panel = c("grey","red"), var.labels.reorder = c(2,1)) -> p
+p %>% ggpar(title = "", xlab = "Cell type", legend = "none", ylab = "Proportion of cells",
+            font.xtickslab = c(12,"bold"), font.ytickslab = c(12), font.y = c(12), font.x = c(12)) -> p
+
+reshape2::dcast(data = p$data, formula = grouping ~ label)
+
+
+ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR_3000.pdf",
+       dpi = "retina", width = 4, height = 4, units = "in")
+
+
+### Using ATAC
+dittoSeq::dittoBarPlot(object = subset(o, nCount_ATAC > 5000), group.by = "cell_ident_MV", var = "ATAC_LOY",
+                       color.panel = c("grey","red"), var.labels.reorder = c(2,1)) -> p
+p %>% ggpar(title = "", xlab = "Cell type", legend = "none", ylab = "Proportion of cells",
+            font.xtickslab = c(12,"bold"), font.ytickslab = c(12), font.y = c(12), font.x = c(12)) -> p
+
+
+### combine ATAC and GEX LOY into a single bar? 
+print_GEX_ATAC_LOY <- function(o, UMI_RNA = 3000, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 2000){
+dittoSeq::dittoBarPlot(object = subset(o, nCount_ATAC > UMI_ATAC & 
+                                         nFeature_ATAC > Feature_ATAC), 
+                       group.by = "cell_ident_MV", var = "ATAC_LOY",
+                       color.panel = c("grey","red"), var.labels.reorder = c(2,1)) -> p1
+
+dittoSeq::dittoBarPlot(object = subset(o, 
+                                         nCount_RNA > UMI_RNA & 
+                                         nFeature_RNA > Feature_RNA), 
+                       group.by = "cell_ident_MV", var = "LOY",
+                       color.panel = c("grey","red"), var.labels.reorder = c(2,1)) -> p2
+
+reshape2::dcast(data = p1$data, formula = grouping ~ label) -> p1 
+reshape2::dcast(data = p2$data, formula = grouping ~ label) -> p2
+p1$DATA <- "ATAC"
+p2$DATA <- "GEX"
+
+rbind(p1,p2) -> p
+
+
+ggbarplot(data = p, x = "grouping", y = "LOY", fill = "DATA", position = position_dodge(0.7), 
+          palette = "Paired") %>% 
+          ggpar(xlab = "Cell type", ylab = "LOY proportion", legend.title = "Data source",
+                font.xtickslab = c(12,"bold"), font.ytickslab = c(12), font.y = c(12), font.x = c(12)) -> p
+
+
+subset(o, nCount_ATAC > UMI_ATAC & nCount_RNA > UMI_RNA & 
+                                         nFeature_RNA > Feature_RNA & 
+                                         nFeature_ATAC > Feature_ATAC) -> tmp
+
+tmp@meta.data %>% group_by(LOY,ATAC_LOY) %>% summarize( count = dplyr::n()) %>% reshape2::dcast(formula = LOY ~ ATAC_LOY) -> df
+print(1 - (as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[1]) / (as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[1]) + 
+                                                 as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[2]))))
+
+return(list(p,df))
+
+}
+
+print_GEX_ATAC_LOY(o, UMI_RNA = 3000, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 1000) -> p;p[[1]]
+ggsave(plot = p[[1]], filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR_GEX_ATAC.pdf",
+       dpi = "retina", width = 4, height = 4, units = "in")
+
+print_GEX_ATAC_LOY(o, UMI_RNA = 2000, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 2000)
+
+print_GEX_ATAC_LOY(o, UMI_RNA = 1500, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 2000) -> p;p[[1]]
+ggsave(plot = p[[1]] %>% ggpar(legend = "none", x.text.angle = 45, font.xtickslab = c(10)), 
+       filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR_GEX_ATAC_1500.pdf",
+       dpi = "retina", width = 4, height = 3, units = "in")
+
+
+### GEX / ATAC LOY agreement
+print_GEX_ATAC_LOY(o, UMI_RNA = 1500, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 1000) -> p;p[[2]]
+
+## agreement between GEX and ATAC LOY at 3000 GEX_UMI and 100000 ATAC UMI is 88.1
+
+
+```
+
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+### Fig 1H
+
+```{r fig1h}
+
+Idents(o) <- "LOY"
+Y <- c("RPS4Y1","ZFY","TBL1Y","USP9Y","DDX3Y","UTY","TMSB4Y","NLGN4Y","KDM5D","EIF1AY")
+       
+AverageExpression(subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000), features = Y) -> dat
+
+dat$RNA %>% as.data.frame()
+dat$ATAC_gene_activity %>% as.data.frame() %>% tibble::rownames_to_column() %>% reshape2::melt() %>%
+  ggbarplot(x = "rowname", y = "value", fill = "variable", position = position_dodge2(), palette = c("red","grey")) %>%
+  ggpar(xlab = "", ylab = "Gene activity (ATAC)", x.text.angle = 45, 
+        font.xtickslab = c(10), font.y = c(12), font.ytickslab = c(10),
+        legend = "none",orientation = "horizontal") -> p
+
+ggsave(filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/CHROM_ACCESS_chrY_genes.pdf", plot = p,
+       units = "in", width = 3, height = 3)
 
 ```
 
@@ -126,7 +274,30 @@ p %>% ggpar(title = "", xlab = "Cell type", legend = "none", ylab = "Proportion 
 
 ### Fig 1G
 
-```{r analysis_fig1g}
+```{r fig1g}
+
+###### NORM ACCESS chrY as UMI threshold increases and GEX gene expression calling becomes more confident 
+
+
+lapply(X = seq(1000,5000,10), FUN = function(x){
+
+  o@meta.data[o@meta.data$nCount_RNA > x & o@meta.data$nFeature_RNA > 1000 ,] %>%
+    dplyr::group_by(LOY) %>% summarise(med = mean(Norm_Access), SD = sd(Norm_Access)) -> out
+
+  data.table(depth = x, LOY = out[out$LOY=="LOY",]$med, NORMAL = out[out$LOY=="NORMAL",]$med) %>% return()
+
+
+}) -> l
+data.table::rbindlist(l) -> l
+
+reshape2::melt(l, id = "depth") -> l
+ggpubr::ggline(l, x = "depth", y = "value", color = "variable", numeric.x.axis = T, plot_type = "l", size = 1) %>%
+  ggpar(xlab = "UMI threshold (GEX)", font.y = c(11),
+        ylab = "", palette = c("red","grey"), legend = "none") -> p
+
+ggsave(plot =p, units = "in", width = 3, height = 2.5, dpi = "retina",
+       filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/CHROM_ACCESS_ACROSS_UMI.pdf")
+
 
 
 ```
@@ -135,65 +306,137 @@ p %>% ggpar(title = "", xlab = "Cell type", legend = "none", ylab = "Proportion 
 
 ### Fig 1F
 
-```{r}
+```{r fig1f}
 
 # inset boxplot (left)
 
-## UMI cutoff 1000
-ggboxplot(o@meta.data[o@meta.data$nCount_RNA > 1000,], x = "LOY", y = "Norm_Access") + stat_compare_means()
-o@meta.data[o@meta.data$nCount_RNA > 1000,] %>% 
-  dplyr::group_by(LOY) %>% 
-  summarise(median_normalized_gene_activity_MSY = median(Norm_Access), n = dplyr::n())
+# ## UMI cutoff 1000
+# ggboxplot(o@meta.data[o@meta.data$nCount_RNA > 1000,], x = "LOY", y = "Norm_Access") + stat_compare_means()
+# o@meta.data[o@meta.data$nCount_RNA > 1000,] %>% 
+#   dplyr::group_by(LOY) %>% 
+#   summarise(median_normalized_gene_activity_MSY = median(Norm_Access), n = dplyr::n())
 
-## UMI cutoff 3000
-ggboxplot(o@meta.data[o@meta.data$nCount_RNA > 3000,], x = "LOY", y = "Norm_Access") + stat_compare_means()
+## UMI cutoff 1500
+ggboxplot(o@meta.data[o@meta.data$nCount_RNA > 1500 & o@meta.data$nFeature_RNA > 1000,],
+          x = "LOY", y = "Norm_Access", fill = "LOY") -> p
+          ggpar(p, ylab = "MSY gene activity (ATAC)", palette = c("red","grey"),
+                xlab = "", x.text.angle = 45, font.y = c(12), legend = "none", font.xtickslab = c(12,"bold")) -> p
+
+ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_ATAC_GEX_BOXPLOT_1500.pdf",
+       dpi = "retina", width = 2, height = 3, units = "in")
+          
+
 o@meta.data[o@meta.data$nCount_RNA > 3000,] %>% 
-  dplyr::group_by(LOY) %>% 
-  summarise(median_normalized_gene_activity_MSY = median(Norm_Access), n = dplyr::n())
+          dplyr::group_by(LOY) %>% 
+          summarise(median_normalized_gene_activity_MSY = median(Norm_Access), n = dplyr::n())
 
 
 # inset boxplot (right)
 ## UMI cutoff 1000
-ggboxplot(o@meta.data[o@meta.data$nCount_RNA > 1000 & o@meta.data$cell_ident_MV=="B tumor",],
-          x = "LOY", y = "Norm_Access", fill = "LOY")  %>%
-  ggpar(palette = c("red","grey"), legend = "none",
-        xlab = "", ylab = "Gene activity (chrY)",
-        font.xtickslab = c(12), x.text.angle = 45) -> out
-out + stat_compare_means()
+ggboxplot(o@meta.data[o@meta.data$nCount_RNA > 1500 & o@meta.data$nFeature_RNA > 1000 & o@meta.data$cell_ident_MV=="B tumor",],
+          x = "LOY", y = "Norm_Access", fill = "LOY") -> p
+          ggpar(p, ylab = "MSY gene activity (ATAC)", palette = c("red","grey"),
+                xlab = "", x.text.angle = 45, font.y = c(12), legend = "none", font.xtickslab = c(12,"bold")) -> p
 
-## UMI cutoff 3000
-ggboxplot(o@meta.data[o@meta.data$nCount_RNA > 3000 & o@meta.data$cell_ident_MV=="B tumor",],
-          x = "LOY", y = "Norm_Access", fill = "LOY")  %>%
-  ggpar(palette = c("red","grey"), legend = "none",
-        xlab = "", ylab = "Gene activity (chrY)",
-        font.xtickslab = c(12), x.text.angle = 45) -> out
-out + stat_compare_means()
+ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_ATAC_GEX_BOXPLOT_TUMOR_1500.pdf",
+       dpi = "retina", width = 2, height = 3, units = "in")
+
+# 3000
+ggboxplot(o@meta.data[o@meta.data$nCount_RNA > 3000 & o@meta.data$nFeature_RNA > 1000 & o@meta.data$cell_ident_MV=="B tumor",],
+          x = "LOY", y = "Norm_Access", fill = "LOY") -> p
+          ggpar(p, ylab = "MSY gene activity (ATAC)", palette = c("red","grey"),
+                xlab = "", x.text.angle = 45, font.y = c(12), legend = "none", font.xtickslab = c(12,"bold")) -> p
+
+ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_ATAC_GEX_BOXPLOT_TUMOR_3000.pdf",
+       dpi = "retina", width = 2, height = 3, units = "in")
+
+#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
+#       dpi = "retina", width = 4, height = 4, units = "in")
 
 
 # Density plot
-# Density plots UMI cutoff 1000
-ggdensity(data = o@meta.data[o@meta.data$nCount_RNA > 1000,], x = "Norm_Access", ylab = "Density",
-          xlab = "Gene activity (chrY)",
-          fill = "LOY", palette = c("red","grey")) + coord_cartesian(xlim = c(0,0.2)) -> p 
-          ggpar(p,legend.title = "LOY classification",
-                title = "UMI cutoff 1000 (all cell-types)")  -> p1
-
-ggdensity(data = o@meta.data[o@meta.data$nCount_RNA > 1000 & o@meta.data$cell_ident_MV=="B tumor",],
+# Density plots UMI cutoff 3000
+ggdensity(data = o@meta.data[o@meta.data$nCount_RNA > 1500 &
+                               o@meta.data$nFeature_RNA > 1000, ],
           x = "Norm_Access", ylab = "Density", 
-          xlab = "Gene activity (chrY)",
-          fill = "LOY", palette = c("red","grey")) + coord_cartesian(xlim = c(0,0.2)) -> p; 
-          ggpar(p, legend.title = "LOY classification", title = "UMI cutoff 1000 (B tumor only)")  -> p2
+          xlab = "MSY gene activity (ATAC)", size = 0.7, 
+          fill = "LOY", palette = c("red","grey")) -> p 
+          ggpar(p,legend.title = "LOY classification (GEX)",
+                title = "")  -> p1
+          
 
-#ggarrange(plotlist = list(p1,p2), common.legend = T, legend = "bottom") 
+ggsave(plot = ggpar(p1, legend = "none"), 
+       filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/DENSITY_GENE_ACTIVITY_ALL.pdf",
+       dpi = "retina", width = 4, height = 4, units = "in")
+
+ggdensity(data = o@meta.data[o@meta.data$nCount_RNA > 1500 & 
+                               o@meta.data$nFeature_RNA > 1000 & 
+                               o@meta.data$cell_ident_MV=="B tumor",],
+          x = "Norm_Access", ylab = "Density", 
+          xlab = "MSY gene activity (ATAC)", size = 0.7,
+          fill = "LOY", palette = c("red","grey")) -> p; 
+          ggpar(p, legend.title = "LOY classification (GEX)", title = "")  -> p2
+
+p2
+
+ggsave(plot = ggpar(p2, legend = "none"), 
+       filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/DENSITY_GENE_ACTIVITY_TUMOR.pdf",
+       dpi = "retina", width = 4, height = 4, units = "in")
+
+
+
+
+# FindMarkers(subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & cell_ident_MV == "B tumor"), 
+#             ident.1 = "LOY", ident.2 = "NORMAL", group.by = "LOY", test.use = "MAST", logfc.threshold = 0.5, 
+#             latent.vars = c("nCount_RNA","percent.rb","percent.mt"))
+# 
+# FindMarkers(subset(o, nCount_ATAC > 10000 & cell_ident_MV == "B tumor"), 
+#             ident.1 = "LOY", ident.2 = "NORMAL", group.by = "ATAC_LOY", test.use = "MAST", logfc.threshold = 0.5, 
+#             latent.vars = c("nCount_RNA","percent.rb","percent.mt"))
+
+```
+
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+### Fig 1E
+
+```{r fig1e}
+
+
+###
+dittoSeq::dittoDimPlot(subset(o, nCount_RNA > 3000 & nCount_ATAC_gene_activity > 10000), var = "Norm_Access", order = "increasing", size = 1.2) +
+  scale_color_viridis_c(oob = scales::squish, limits = c(0,0.15)) -> out
+out %>% ggpar(legend = "none") -> out
+out
+ggsave(plot = out + NoAxes(), filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/GENE_ACTIVITY_UMAP_3000.pdf",
+       dpi = "retina", width = 4, height = 4, units = "in")
+
+
+dittoSeq::dittoDimPlot(subset(o, nCount_ATAC_gene_activity > 10000), 
+                       var = "Norm_Access", order = "increasing", size = 1.2) +
+  scale_color_viridis_c(oob = scales::squish, limits = c(0,0.15)) -> out
+
+out
+ggsave(plot = out %>% ggpar(legend = "none") + NoAxes(), filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/GENE_ACTIVITY_UMAP_1500.pdf",
+       dpi = "retina", width = 4, height = 4, units = "in")
+
+
+subset(o,nCount_ATAC_gene_activity > 10000) -> tmp
+
+tmp@meta.data %>% dplyr::group_by(cell_ident_MV) %>% 
+  dplyr::summarise(mean_gene_activity = mean(Norm_Access), sd = sd(Norm_Access))
+
+tmp@meta.data %>% dplyr::group_by(cell_ident_MV,LOY) %>% 
+  dplyr::summarise(mean_gene_activity = mean(Norm_Access), sd = sd(Norm_Access)) %>% reshape2::dcast(cell_ident_MV ~ LOY)
 
 
 ```
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-### SUPP FIG 2
+### Supp Fig 2
 
-Supplementary Fig. 2 \| Y chromosome ATAC gene activity is exclusively repressed in LOY nuclei. Boxplots comparing LOY and non-LOY/normal nuclei chromatin accessibility-based gene activity across all chromosomes (n=9,380). Gene activity scores were calculated using genes with \> 0.2 normalized expression across all nuclei from the chromosome of interest. Boxes represent the 25th percentile, median, and 75th percentile. The whiskers extend to the furthest value that is no more than 1.5 times the inter-quartile range. LOY was classified using expression.
+Supplementary Fig. 2 \| Y chromosome ATAC gene activity is exclusively repressed in LOY nuclei. LOY was classified using gene expression. Boxplots comparing LOY and non-LOY/normal nuclei chromatin accessibility-based gene activity across all chromosomes (n=3,834). Gene activity scores were calculated using genes with \> 0.2 normalized expression across all nuclei from the chromosome of interest. Boxes represent the 25th percentile, median, and 75th percentile. The whiskers extend to the furthest value that is no more than 1.5 times the inter-quartile range.
 
 ```{r S2}
 
@@ -212,7 +455,8 @@ lapply(c(1:22,"X","Y"), function(i){
   edb.x <- addFilter(edb, SeqNameFilter(i))
   genes(edb.x) -> tmp
   Repitools::annoGR2DF(tmp) -> tmp
-  AverageExpression(subset(o, nCount_RNA > 3000), features = tmp$gene_name) -> dat
+  AverageExpression(subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000), 
+                    features = tmp$gene_name) -> dat
 
   dat$ATAC_gene_activity[rownames(dat$ATAC_gene_activity) %in% elig,] %>% 
     as.data.frame() -> k
@@ -236,16 +480,17 @@ ggpubr::ggboxplot(output, x = "chr", y = "value",
 
 ```
 
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
+### Supp Fig 3
 
-### SUPP FIG 3
 ```{r S3}
 
 #### S3A
 Idents(o) <- "LOY"
 DefaultAssay(o) <- "ATAC"
 p1 <- CoveragePlot(
-  object = subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000), tile = F,
+  object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000), tile = F,
   region = "UTY",
   features = "UTY", window = 2000,
   expression.assay = "RNA",
@@ -253,16 +498,15 @@ p1 <- CoveragePlot(
   extend.downstream = 500
 )
 
-#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
-#       dpi = "retina", width = 4, height = 4, units = "in")
-
-
+p1
+ggsave(plot = p1, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/UTY_GENE_ACTIVITY.pdf",
+       dpi = "retina", width = 7, height = 7, units = "in")
 
 #### S3B
 Idents(o) <- "LOY"
 DefaultAssay(o) <- "ATAC"
 p2 <- CoveragePlot(
-  object = subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000), tile = F,
+  object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000), tile = F,
   region = "ZFY",
   features = "ZFY", window = 2000,
   expression.assay = "RNA",
@@ -270,9 +514,9 @@ p2 <- CoveragePlot(
   extend.downstream = 500
 )
 
-#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
-#       dpi = "retina", width = 4, height = 4, units = "in")
-
+p2
+ggsave(plot = p2, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/ZFY_GENE_ACTIVITY.pdf",
+       dpi = "retina", width = 7, height = 7, units = "in")
 
 
 
