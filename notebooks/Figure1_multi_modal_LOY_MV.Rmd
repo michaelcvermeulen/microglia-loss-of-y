@@ -242,7 +242,7 @@ ggsave(plot = p[[1]] %>% ggpar(legend = "none", x.text.angle = 45, font.xticksla
 ### GEX / ATAC LOY agreement
 print_GEX_ATAC_LOY(o, UMI_RNA = 1500, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 1000) -> p;p[[2]]
 
-## agreement between GEX and ATAC LOY at 3000 GEX_UMI and 100000 ATAC UMI is 88.1
+
 
 
 ```
