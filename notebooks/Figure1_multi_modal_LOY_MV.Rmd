@@ -149,6 +149,13 @@ dittoSeq::dittoDimPlot(object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 100
 ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_UMAP.pdf",
        dpi = "retina", width = 3, height = 3, units = "in")
 
+
+## of all LOY nuclei, what proportion were found in the B tumor cluster.
+subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000) -> tmp
+
+tmp@meta.data[tmp$LOY=="LOY",] %>% dplyr::group_by(cell_ident_MV) %>% dplyr::summarise(nuclei = dplyr::n())
+
+
 ```
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
@@ -244,8 +251,29 @@ ggsave(plot = p[[1]] %>% ggpar(legend = "none", x.text.angle = 45, font.xticksla
 print_GEX_ATAC_LOY(o, UMI_RNA = 1500, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 1000) -> p;p[[2]]
 
 
+### LOY vs non LOY activity scores. 
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000) -> tmp
+tmp@meta.data %>% dplyr::group_by(LOY) %>% dplyr::summarise(mean_activity = mean(Norm_Access), sd = sd(Norm_Access))
 
 
+
+### MSY GEX v ATAC MSY by nuclei
+
+subset(o, nCount_ATAC > 10000 & nCount_RNA > 1500 & 
+                                         nFeature_RNA > 1000 & 
+                                         nFeature_ATAC > 1000) -> tmp
+
+ggscatter(data = tmp@meta.data, x = "Norm_Access", y = "normY", 
+          xlab = "MSY Gene activity (ATAC)", alpha = 0.4,
+          ylab = "Normalized Y expression (GEX)",
+          add = "reg.line", size = 0.9, add.params = list(color="blue"),
+          facet.by = "cell_ident_MV") + stat_cor()
+
+ggscatter(data = tmp@meta.data[tmp@meta.data$cell_ident_MV=="B tumor",], x = "Norm_Access", y = "normY", 
+          xlab = "MSY Gene activity (ATAC)", alpha = 0.4,
+          ylab = "Normalized Y expression (GEX)",
+          add = "reg.line", size = 0.9, add.params = list(color="blue"),
+          facet.by = "cell_ident_MV") + stat_cor()
 ```
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
@@ -429,6 +457,16 @@ tmp@meta.data %>% dplyr::group_by(cell_ident_MV) %>%
 
 tmp@meta.data %>% dplyr::group_by(cell_ident_MV,LOY) %>% 
   dplyr::summarise(mean_gene_activity = mean(Norm_Access), sd = sd(Norm_Access)) %>% reshape2::dcast(cell_ident_MV ~ LOY)
+
+
+
+
+subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000) -> tmp
+
+tmp@meta.data %>% dplyr::group_by(LOY) %>% dplyr::summarise(mean_MSY_gene_activity = mean(Norm_Access), sd = sd(Norm_Access))
+wilcox.test(x = tmp@meta.data[tmp@meta.data$LOY == "LOY",]$Norm_Access,
+            y = tmp@meta.data[tmp@meta.data$LOY=="NORMAL",]$Norm_Access ) 
+
 
 
 ```
