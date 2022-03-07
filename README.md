@@ -1,8 +1,6 @@
 # Mosaic loss of chromosome Y in human microglia
 
 This repository contains scripts to analyse the data and reproduce the figures from the Mosaic loss of chromosome Y in human microglia project.
-Scripts are written in Rmarkdown documents for readability and are organised in order of the Figures and Tables in the paper.
-Pre-processing scripts are provided as R documents. 
 
 Mosaic loss of chromosome Y in human microglia. Michael C. Vermeulen, Richard Pearse, Tracy Young-Pearse, Sara Mostafavi
 Center for Molecular Medicine and Therapeutics, University of British Columbia, Vancouver, Canada
