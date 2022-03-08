@@ -6,6 +6,9 @@ output: html_document
 ---
 
 ```{r setup_packages, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
 library(Seurat)
 library(magrittr)
 library(data.table)
@@ -39,6 +42,9 @@ Pre-processing completed using the Processing_multi_modal.R script which is larg
 https://satijalab.org/signac/articles/pbmc_vignette.html
 
 ```{r load_data}
+
+## this seurat object was created using the using 
+## https://github.com/michaelcvermeulen/microglia-loss-of-y/blob/main/scripts/Preprocessing_multi_modal.R
 
 readRDS("e:/LOY/scLOY/data/10X_MULTIOME_LYMPH/seurat_MV.RDS") -> o
 
