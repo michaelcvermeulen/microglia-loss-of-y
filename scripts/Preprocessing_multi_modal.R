@@ -94,12 +94,17 @@ DefaultAssay(o) <- "ATAC"
 o <- NucleosomeSignal(o)
 o <- TSSEnrichment(o)
 
+FractionCountsInRegion(o, regions = blacklist_hg38, assay = "ATAC") -> o$blacklist_ratio
+
 VlnPlot(
   object = o,
-  features = c("nCount_RNA", "nCount_ATAC", "TSS.enrichment", "nucleosome_signal"),
+  features = c("nCount_RNA", "nCount_ATAC", "TSS.enrichment", "nucleosome_signal","blacklist_ratio"),
   ncol = 4,
   pt.size = 0
 )
+
+
+
 
 o <- subset(
   x = o,
