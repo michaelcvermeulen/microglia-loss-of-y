@@ -335,7 +335,7 @@ print_GEX_ATAC_LOY_mat(o, UMI_RNA = 1000, Feature_RNA = 0, UMI_ATAC = 0, Feature
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 
-### Agreement between assays (venn diagrams)
+### LOY agreement between assays (venn diagrams)
 
 ```{r venn_diag}
 
@@ -351,16 +351,34 @@ ggvenn(l) -> ven0.
 
 
 print_GEX_ATAC_LOY(o, UMI_RNA = 1500, Feature_RNA =  1000 , UMI_ATAC = 10000, Feature_ATAC = 1000) -> p
-subset(o, nCount_RNA >= 1500 & nFeature_RNA > 1000 & nCount_ATAC > 10000 & nFeature_ATAC > 1000 & scDblFinder.class == "singlet") -> oo
+subset(o, nCount_RNA >= 1500 & nFeature_RNA > 1000 & nCount_ATAC > 10000 & nFeature_ATAC > 1000) -> oo
 list(GEX = which(oo@meta.data$LOY == "LOY"), ATAC = which(oo@meta.data$ATAC_LOY == "LOY")) -> l
 ggvenn(l) -> ven1
 
 
 
-subset(o, nCount_RNA >= 1500 & nFeature_RNA >= 1000 & nCount_ATAC >= 10000 & nFeature_ATAC > 1000 & scDblFinder.class == "singlet") -> oo
-list(GEX = which(oo@meta.data$LOY == "NORMAL"), ATAC = which(oo@meta.data$ATAC_LOY == "NORMAL")) -> l
-ggvenn(l) -> ven2
+# random 
+seed <- 44
+lapply(1:10000, function(x){ 
+sample(x = c("LOY","NORMAL"), replace = TRUE, size = (1351 + 2634), prob = c(0.368,0.632)) -> a 
+sample(x = c("LOY","NORMAL"), replace = TRUE, size = (1351 + 2634), prob = c(0.368,0.632)) -> b
+cbind(a,b) -> tmp 
 
+return(as.numeric((table(tmp[,1],tmp[,2])[1,1]) / (table(tmp[,1],tmp[,2])[1,2] + 
+                                              table(tmp[,1],tmp[,2])[1,1] + 
+                                              table(tmp[,1],tmp[,2])[2,1])))
+
+
+}) -> l
+hist(unlist(l))
+
+```
+
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+```{r mismatch_LOY_properties}
+
+subset(o, nCount_RNA >= 1500 & nFeature_RNA >= 1000 & nCount_ATAC >= 10000 & nFeature_ATAC > 1000) -> oo
 
 oo@meta.data$ATAC_NORMAL_GEX_LOY <- FALSE
 oo@meta.data[which(oo@meta.data$LOY=="LOY" & oo@meta.data$ATAC_LOY=="NORMAL"),]$ATAC_NORMAL_GEX_LOY <- TRUE
@@ -398,8 +416,61 @@ oo@meta.data %>% dplyr::group_by(ATAC_LOY_GEX_NORMAL, cell_ident_MV) %>%
 
 
 
+
+oo@meta.data[oo@meta.data$cell_ident_MV == "B tumor",] %>% dplyr::group_by(ATAC_LOY_GEX_NORMAL) %>%
+  dplyr::summarise(TSS = mean(TSS.enrichment),
+                   nCount = mean(nCount_RNA),
+                   nFeature = mean(nFeature_RNA),
+                   nCount_A = mean(nCount_ATAC),
+                   nFeature_A = mean(nFeature_ATAC),
+                   nuc = mean(nucleosome_signal),
+                   percent.rb = mean(percent.rb),
+                   percent.mt = mean(percent.mt))
+
+oo@meta.data[oo@meta.data$cell_ident_MV == "B tumor",] %>% dplyr::group_by(ATAC_NORMAL_GEX_LOY) %>%
+  dplyr::summarise(TSS = mean(TSS.enrichment),
+                   nCount = mean(nCount_RNA),
+                   nFeature = mean(nFeature_RNA),
+                   nCount_A = mean(nCount_ATAC),
+                   nFeature_A = mean(nFeature_ATAC),
+                   nuc = mean(nucleosome_signal),
+                   percent.rb = mean(percent.rb),
+                   percent.mt = mean(percent.mt))
+
+
 ```
 
+
+
+
+```{r PAR}
+
+
+o[["ATAC_gene_activity"]]@data -> data
+data %>% as.matrix() -> data
+data[rownames(data) %in% expressed_PAR_genes(o),] -> PAR_counts
+PAR_counts %>% colMeans() %>% as.data.frame() -> PAR
+names(PAR) <- "PAR_Access"
+left_join(x = tibble::rownames_to_column(o@meta.data,"CB"), y = tibble::rownames_to_column(PAR,"CB"), by = "CB" ) %>%
+  tibble::column_to_rownames("CB") -> o@meta.data
+
+
+subset(o, nCount_ATAC > 10000 & nFeature_ATAC > 1000) -> oo
+ggboxplot(oo@meta.data[oo@meta.data$cell_ident_MV=="B tumor",],
+          x = "ATAC_LOY", y = "PAR_Access", facet.by = "cell_ident_MV") + stat_compare_means()
+
+subset(o, nCount_RNA >= 1500 & nFeature_RNA > 1000) -> oo
+ggboxplot(oo@meta.data[oo@meta.data$cell_ident_MV=="B tumor",],
+          x = "LOY_levels", y = "normPAR", facet.by = "cell_ident_MV") + stat_compare_means()
+
+
+
+
+
+
+
+
+```
 
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
