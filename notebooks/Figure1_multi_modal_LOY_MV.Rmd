@@ -203,8 +203,32 @@ p %>% ggpar(title = "", xlab = "Cell type", legend = "none", ylab = "Proportion 
 
 
 ### combine ATAC and GEX LOY into a single bar? 
+print_GEX_ATAC_LOY_mat <- function(o, UMI_RNA = 3000, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 2000){
+  
+  subset(o, nCount_ATAC > UMI_ATAC & nCount_RNA > UMI_RNA & 
+                                         nFeature_RNA > Feature_RNA & 
+                                         nFeature_ATAC > Feature_ATAC) -> tmp
+
+tmp@meta.data %>% group_by(LOY,ATAC_LOY) %>% summarize( count = dplyr::n()) %>% reshape2::dcast(formula = LOY ~ ATAC_LOY) -> df
+
+
+print(1 - (as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[1]) / (as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[1]) + 
+                                                 as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[2]))))
+
+1 - (as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[1]) / (as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[1]) + 
+                                                 as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[2]))) -> k
+
+return(k)
+  
+  
+}
+
+
+
+
 print_GEX_ATAC_LOY <- function(o, UMI_RNA = 3000, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 2000){
-dittoSeq::dittoBarPlot(object = subset(o, nCount_ATAC > UMI_ATAC & 
+
+  dittoSeq::dittoBarPlot(object = subset(o, nCount_ATAC > UMI_ATAC & 
                                          nFeature_ATAC > Feature_ATAC), 
                        group.by = "cell_ident_MV", var = "ATAC_LOY",
                        color.panel = c("grey","red"), var.labels.reorder = c(2,1)) -> p1
@@ -237,7 +261,10 @@ tmp@meta.data %>% group_by(LOY,ATAC_LOY) %>% summarize( count = dplyr::n()) %>% 
 print(1 - (as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[1]) / (as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[1]) + 
                                                  as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[2]))))
 
-return(list(p,df))
+1 - (as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[1]) / (as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[1]) + 
+                                                 as.numeric(table(tmp$LOY==tmp$ATAC_LOY)[2]))) -> k
+
+return(list(p,df,k))
 
 }
 
@@ -247,7 +274,7 @@ ggsave(plot = p[[1]], filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/
 
 print_GEX_ATAC_LOY(o, UMI_RNA = 2000, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 2000)
 
-print_GEX_ATAC_LOY(o, UMI_RNA = 1500, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 2000) -> p;p[[1]]
+print_GEX_ATAC_LOY(o, UMI_RNA = 1500, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 1500) -> p;p[[1]]
 ggsave(plot = p[[1]] %>% ggpar(legend = "none", x.text.angle = 45, font.xtickslab = c(10)), 
        filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR_GEX_ATAC_1500.pdf",
        dpi = "retina", width = 4, height = 3, units = "in")
@@ -280,7 +307,100 @@ ggscatter(data = tmp@meta.data[tmp@meta.data$cell_ident_MV=="B tumor",], x = "No
           ylab = "Normalized Y expression (GEX)",
           add = "reg.line", size = 0.9, add.params = list(color="blue"),
           facet.by = "cell_ident_MV") + stat_cor()
+
+
+lapply(X = seq(0, 15000, 500), FUN = function(y){
+  lapply(X = seq(0, 5000, 500), FUN = function(x){
+  
+  print_GEX_ATAC_LOY_mat(o, UMI_RNA = x, Feature_RNA = 1000, UMI_ATAC = y, Feature_ATAC = 1000) -> p
+  
+  return(data.frame(UMI = x , ATAC = y, agree = p)) 
+  
+  }) -> l
+  return(data.table::rbindlist(l))
+}) -> out
+data.table::rbindlist(out) -> out
+
+reshape2::dcast(data = out, formula = UMI ~ ATAC, value.var = "agree") -> mat
+mat[,1] -> rownames(mat); mat <- mat[,-1]
+
+pheatmap::pheatmap(mat, cluster_rows = F, cluster_cols = F)
+
+
+print_GEX_ATAC_LOY_mat(o, UMI_RNA = 1000, Feature_RNA = 0, UMI_ATAC = 0, Feature_ATAC = 0) -> p
+
+
 ```
+
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+
+### Agreement between assays (venn diagrams)
+
+```{r venn_diag}
+
+print_GEX_ATAC_LOY(o, UMI_RNA = 1000, Feature_RNA = 0, UMI_ATAC = 0, Feature_ATAC = 0) -> p
+subset(o, nCount_RNA >= 1000 & nFeature_RNA > 0 & nCount_ATAC > 0 & nFeature_ATAC > 0) -> oo
+list(GEX = which(oo@meta.data$LOY == "LOY"), ATAC = which(oo@meta.data$ATAC_LOY == "LOY")) -> l
+ggvenn(l) -> ven0
+
+subset(o, nCount_RNA >= 1000 & nFeature_RNA > 0 & nCount_ATAC > 0 & nFeature_ATAC > 0) -> oo
+list(GEX = which(oo@meta.data$LOY == "NORMAL"), ATAC = which(oo@meta.data$ATAC_LOY == "NORMAL")) -> l
+ggvenn(l) -> ven0.
+
+
+
+print_GEX_ATAC_LOY(o, UMI_RNA = 1500, Feature_RNA =  1000 , UMI_ATAC = 10000, Feature_ATAC = 1000) -> p
+subset(o, nCount_RNA >= 1500 & nFeature_RNA > 1000 & nCount_ATAC > 10000 & nFeature_ATAC > 1000 & scDblFinder.class == "singlet") -> oo
+list(GEX = which(oo@meta.data$LOY == "LOY"), ATAC = which(oo@meta.data$ATAC_LOY == "LOY")) -> l
+ggvenn(l) -> ven1
+
+
+
+subset(o, nCount_RNA >= 1500 & nFeature_RNA >= 1000 & nCount_ATAC >= 10000 & nFeature_ATAC > 1000 & scDblFinder.class == "singlet") -> oo
+list(GEX = which(oo@meta.data$LOY == "NORMAL"), ATAC = which(oo@meta.data$ATAC_LOY == "NORMAL")) -> l
+ggvenn(l) -> ven2
+
+
+oo@meta.data$ATAC_NORMAL_GEX_LOY <- FALSE
+oo@meta.data[which(oo@meta.data$LOY=="LOY" & oo@meta.data$ATAC_LOY=="NORMAL"),]$ATAC_NORMAL_GEX_LOY <- TRUE
+
+dittoSeq::dittoDimPlot(oo, var = "ATAC_NORMAL_GEX_LOY", order = "increasing", color.panel = c(3,2)) %>% 
+  ggpar(title = "Mismatches |   ATACseq=WT   RNAseq=LOY") + NoAxes() -> p
+
+
+oo@meta.data$ATAC_LOY_GEX_NORMAL <- FALSE
+oo@meta.data[which(oo@meta.data$LOY=="NORMAL" & oo@meta.data$ATAC_LOY=="LOY"),]$ATAC_LOY_GEX_NORMAL <- TRUE
+dittoSeq::dittoDimPlot(oo, var = "ATAC_LOY_GEX_NORMAL", order = "increasing", color.panel = c(3,2), 
+                       split.by = "ATAC_LOY_GEX_NORMAL") %>% 
+  ggpar(title = "Mismatches |   ATACseq=LOY   RNAseq=WT") + NoAxes() + NoLegend() -> p
+
+
+oo@meta.data$AGREE <- FALSE
+oo@meta.data[which(oo@meta.data$LOY==oo@meta.data$ATAC_LOY),]$AGREE <- TRUE
+
+
+dittoSeq::dittoDimPlot(oo, var = "AGREE", order = "decreasing", color.panel = c(3,2), split.by = "AGREE") %>% 
+  ggpar(title = "LOY agreement |  ATAC and RNA ") + NoAxes() + NoLegend() -> p
+
+
+
+oo@meta.data %>% dplyr::group_by(ATAC_LOY_GEX_NORMAL, cell_ident_MV) %>% 
+  dplyr::summarise(
+    count = dplyr::n(),
+    median_nCount_RNA = median(nCount_RNA),
+    median_nFeature_RNA = median(nFeature_RNA),
+    median_nFeature_ATAC = median(nFeature_ATAC),
+    median_nCount_ATAC = median(nCount_ATAC),
+    LOY_levels = mean(LOY_levels),
+    Norm_Access = median(Norm_Access)
+                   ) %>% reshape2::dcast(cell_ident_MV ~ ATAC_LOY_GEX_NORMAL, value.var = ("Norm_Access"))
+
+
+
+```
+
+
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
