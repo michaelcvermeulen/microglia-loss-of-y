@@ -38,7 +38,7 @@ source("E:/LOY/scLOY/scripts/annotation_functions.R")
 filter_function <- function(min_cells=75, sum_Y_exp=250,l ){
 ## cleans up 
   
-l[l$TOTAL_CELLS > 75 & l$sum_Y_exp >= 250, ] -> l
+l[l$TOTAL_CELLS > min_cells & l$sum_Y_exp >= sum_Y_exp, ] -> l
 l[l$cell_type%in%c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte"),] -> dat
 dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
 dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
