@@ -33,6 +33,11 @@ gsm <-getGEO("GSE174332", destdir = "H:/LOY/scLOY/data/GEO")
 gsm[[1]] -> gsm
 pheno<-pData(phenoData(gsm))
 
+
+# downloaded snRNAseq matricies from: 
+# https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE174332&format=file
+
+
 # load raw data from dir
 files <- list.dirs(path = "E:/LOY/scLOY/data/BRAIN_GSE174332", full.names = T); files <- files[-1]
 lapply(X = files, FUN = function(x){
