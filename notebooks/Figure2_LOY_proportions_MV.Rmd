@@ -52,46 +52,6 @@ dat[which(dat$neuro_degen_diagnosis=="AD"),]$neuro_degen_diagnosis <- "AD/MCI"
 return(dat)
   
 }
-```
-
-## LOY proportion analysis in brain tissue (Fig 2)
-
-```{r load_data}
-
-```
-
-```{r preprocessing}
-
-```
-
-\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
-
-### Fig 1A
-
-
-```{r }
-
-library(Biobase)
-library(GEOquery)
-library(Seurat)
-library(ggpubr)
-library(tidyverse)
-library(scibetR)
-library(harmony)
-library(viridis)
-library(tibble)
-library(reshape2)
-library(scDblFinder)
-suppressPackageStartupMessages(library(EnsDb.Hsapiens.v86))
-edb <- EnsDb.Hsapiens.v86
-
-setwd("H:/LOY/scLOY/scLOY/")
-source("E:/LOY/Example/PACKAGE/call_LOY.R")
-source("E:/LOY/scLOY/scripts/loy_functions.R")
-source("E:/LOY/scLOY/scripts/loy_summary_functions.R")
-source('H:/LOY/scLOY/scLOY/R/load.R')
-source('H:/LOY/scLOY/scLOY/data_raw/build_data_files.R')
-
 
 # function to pull p value from lm model
 lmp <- function (modelobject) {
@@ -102,51 +62,106 @@ lmp <- function (modelobject) {
   return(p)
 }
 
-### TOTAL CELLS IN STUDY
+
+
+### SAVE
+save <- F
+
+
+```
+
+### Fig 2a
+
+
+```{r pre_filter_stats }
+
+
+### TOTAL CELLS IN STUDY (PRE FILTER)
 
 output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
-data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
+data.table::fread(paste0(output,"/LOY_prop_table_1500_1000.txt")) -> l
 
-filter_function(min_cells = 0, sum_Y_exp = 0, l = l) -> dat
+filter_function(min_cells = 0, sum_Y_ex = 0, l = l) -> dat
 paste0(dat$sample, "_", dat$cohort) -> dat$ID
 gsub(pattern = "_cleaned_filtered", x = dat$cohort, replacement = "") -> dat$cohort
 
 dat %>% dplyr::group_by(cohort) %>% dplyr::summarise(`Total cells`=sum(TOTAL_CELLS)) -> out
-data.table::fwrite(x = out, file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/TABLES/UPDATED_MALE_CELLS_3000.csv")
 
-dat %>% dplyr::group_by(ID) %>% dplyr::summarise(mean = mean(LOY_prop)) -> out
-out[out$mean > 0,] %>% nrow()
+if(save == T){
+data.table::fwrite(x = out, file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/TABLES/UPDATED_MALE_CELLS_1500.csv")}
 
+## how many samples w/ LOY
+dat %>% dplyr::group_by(ID) %>% dplyr::summarise(mean = mean(LOY_prop)) -> out.
+out.[out.$mean > 0,] %>% nrow()
 
 ## number of cells/nuclei
-dat$TOTAL_CELLS %>% sum()
+out$`Total cells` %>% sum() -> cells
 
 ## number of samples
-dat %>% group_by(cohort, sample) %>% summarize(n = dplyr::n()) %>% nrow()
+# dat %>% group_by(cohort, sample) %>% summarize(n = dplyr::n()) %>% nrow()
 dat %>% group_by(cohort, sample) %>% summarize(n = dplyr::n(), age = mean(donor_organism.age)) -> tmp
-tmp$sample %>% length()
+tmp$sample %>% length() -> s
 
-## age data avilable
-is.na(tmp$age) %>% table()
+paste0("Before filtering our dataset was comprised of ", cells, " cells/nuclei from ", s, " donors")
+paste0("This includes all CNS cells/nuclei with >1500 UMI and >1000 genes")
 
-## mean age and range
-mean(tmp$age, na.rm = T)
-max(tmp$age, na.rm = T)
-min(tmp$age, na.rm = T)
+```
+
+
+
+```{r post_filter_stats}
+### TOTAL CELLS IN STUDY (POST FILTER)
+output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
+
+filter_function(min_cells = 75, sum_Y_ex = 250, l = l) -> dat
+paste0(dat$sample, "_", dat$cohort) -> dat$ID
+gsub(pattern = "_cleaned_filtered", x = dat$cohort, replacement = "") -> dat$cohort
+
+dat %>% dplyr::group_by(cohort) %>% dplyr::summarise(`Total cells`=sum(TOTAL_CELLS)) -> out
+
+paste0("We applied strict QC filtering to our dataset to isolate high-information cells/nuclei ",
+"allowing for more reliable loss of chrY calling")
+
+paste0("Cells/nuclei were included if they had >3000 UMI counts and >1000 genes")
+paste0("Cell type clusters from individual samples were included if total cells/nuclei >75")
+paste0("We also tested chrY expression in non-LOY nuclei in each cell type population in each sample")
+paste0("Cell type populations in specific samples were removed ",
+       "if MSY genes were not significantly expressed in WT (non-LOY) male cells.")
+
+if(save == T){
+data.table::fwrite(x = out, file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/TABLES/UPDATED_MALE_CELLS_1500.csv")}
+
+## how many samples w/ LOY
+#dat %>% dplyr::group_by(ID) %>% dplyr::summarise(mean = mean(LOY_prop)) -> out.
+#out.[out.$mean > 0,] %>% nrow()
+
+## number of cells/nuclei
+out$`Total cells` %>% sum() -> tot
+
+## number of samples
+# dat %>% group_by(cohort, sample) %>% summarize(n = dplyr::n()) %>% nrow()
+dat %>% group_by(cohort, sample) %>% summarize(n = dplyr::n(), age = mean(donor_organism.age)) -> tmp
+tmp$sample %>% length() -> s 
+
+## age data available
+is.na(tmp$age) %>% table() %>% .[1] -> age_data
+
+paste0("After filtering our dataset was comprised of ", tot, " cells/nuclei from ", s, " donors")
+
+paste0("Of these donors ", age_data, " had available age data")
+paste0("Mean age was ", round(mean(tmp$age, na.rm = T),2), " range: ", 
+       round(min(tmp$age, na.rm = T)) ,"-",
+       round(max(tmp$age, na.rm = T)))
 
 
 
 ###### SAMPLE SIZE | NEURO DIAG
-data.table::fread(paste0(output,"/LOY_prop_table_1500_1000.txt")) -> l
-l[l$cell_type%in%c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC"),] -> dat
+data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
+filter_function(min_cells = 75, sum_Y_ex = 250, l = l) -> dat
 paste0(dat$sample, "_", dat$cohort) -> dat$ID
-dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
-dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
-dat[!grepl(dat$tissue, pattern = "Lung"),] -> dat
-dat[!grepl(dat$cohort, pattern = "PRJNA434002_cleaned_filtered"),] -> dat
-dat[!grepl(dat$cohort, pattern = "syn16780177_cleaned_filtered"),] -> dat
-dat[!grepl(dat$cohort, pattern = "syn22130805_cleaned_filtered"),] -> dat
 dat %>% dplyr::distinct(ID, .keep_all = T ) %>% dplyr::group_by(neuro_degen_diagnosis) %>% dplyr::summarise(count = dplyr::n())
+
 
 
 #### MAIN DATASET SUMMARIZING STATISTICS #####
@@ -154,37 +169,20 @@ data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
 
 
 ##
-l[l$TOTAL_CELLS > 75 & l$sum_Y_exp >= 250, ] -> l
-l[l$cell_type%in%c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte"),] -> dat
-dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
-dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
-dat[!grepl(dat$cohort, pattern = "PRJNA434002_cleaned_filtered"),] -> dat
-dat[!grepl(dat$cohort, pattern = "syn16780177_cleaned_filtered"),] -> dat
-dat[!grepl(dat$cohort, pattern = "syn22130805_cleaned_filtered"),] -> dat
-dat[!grepl(dat$tissue, pattern = "Lung"),] -> dat
-#data.table::fwrite(dat, file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/TABLES/sample_cell_type_LOY_data.csv")
+filter_function(l, min_cells = 75, sum_Y_exp = 250) -> dat
 
 # net LOY prop
 dat %>% group_by(cell_type) %>% summarise(LOY = sum(LOY_cells), NORMAL = sum(NORMAL_cells)) %>%
   dplyr::mutate(total = LOY + NORMAL, prop = LOY / total) -> out
-#data.table::fwrite(out, file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/TABLES/summarized_cell_type_LOY.csv")
+
+if(save == T){
+data.table::fwrite(out, file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/TABLES/summarized_cell_type_LOY.csv")}
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# LOY % by sample 
+paste0(dat$sample,"_",dat$cohort) -> dat$ID
+dat %>% group_by(ID) %>% summarise(LOY = sum(LOY_cells), NORMAL = sum(NORMAL_cells)) %>%
+  dplyr::mutate(total = LOY + NORMAL, prop = LOY / total) -> out
 
 
 
@@ -195,10 +193,8 @@ dat %>% group_by(cell_type) %>% summarise(LOY = sum(LOY_cells), NORMAL = sum(NOR
 
 ### NUMBER OF SAMPLES WITH GREATER THAN 10, 15, 20, 25% LOY ######
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
-l[l$TOTAL_CELLS > 75 & l$sum_Y_exp >= 250, ] -> l
-l[l$cell_type%in%c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte"),] -> dat
-dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
-dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
+filter_function(min_cells = 75, sum_Y_ex = 250, l = l) -> dat
+paste0(dat$sample, "_", dat$cohort) -> dat$ID
 
 dat[dat$LOY_prop > 0.10,]$cell_type %>% table()
 dat[dat$LOY_prop > 0.15,]$cell_type %>% table()
