@@ -21,11 +21,14 @@ source('H:/LOY/scLOY/scLOY/data_raw/build_data_files.R')
 
 
 ### call LOY stats across all merged cohorts
+### Seurat objects used for this LOY analysis are available upon request. 
+
 
 ## build stats files
 files <- list.files(path = "e:/LOY/scLOY/processed_seurat/MERGED_COHORT/", full.names = T, recursive = T)
 nFeature <- 1000
 meta_output <- "e:/LOY/scLOY/results/LOY_DE/STATS_JULY21/"
+
 for(i in files){
   readRDS(i) -> oo
   check_object_meta(oo@meta.data)
