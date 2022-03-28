@@ -27,6 +27,8 @@ source('H:/LOY/scLOY/scLOY/R/load.R')
 source('H:/LOY/scLOY/scLOY/data_raw/build_data_files.R')
 ###
 
+
+# color palette
 vega <- c('#1f77b4','#aec7e8','#ff7f0e',
           '#ffbb78','#2ca02c','#98df8a',
           '#d62728','#ff9896','#9467bd',
@@ -46,19 +48,20 @@ cell_pal <- function(cell_vars, pal_fun,...) {
   }
 }
 
+# microglia dissociation associated genes
 diss <- c("RGS1","DUSP1","AC022217.3","DUSP1","HSPA1A","HSPA1B","DDIT4","SLC2A3","FOS","JUN",
           "AC131944.1","HIF1A-AS3","HIST1H2AC","HIST1H2BD","HIST1H2BG","HIST2H2BE","RGS2","RHOB",
           "HIST1H2BJ","TEX14","UBC","HSP90AA1","AL118516.1","JUNB","HIST2H2AA4","HIST1H1C","BTG1","BTG2","DUSP5")
 
+# microglia gene sets from previous publications
+# https://github.com/michaelcvermeulen/microglia-loss-of-y/blob/main/data/microglia_gene_sets.csv
 read.csv("h:/LOY/scLOY/data/microglia_gene_sets.csv") -> gene_sets
-
 
 
 ## read in preprocessed GSE160936 seurat object.
 ## processed using Preprocessing_scrnaseq.R script template. 
-
+## https://github.com/michaelcvermeulen/microglia-loss-of-y/blob/main/scripts/Preprocessing_scrnaseq.R
 readRDS(file = "E:/LOY/scLOY/processed_seurat/BRAIN/GSE160936_AD_GLIAL_introns_included.RDS") -> o
-#DimPlot(o, group.by = "RNA_snn_res.1.1", reduction = "umap")
 
 ### ALL #############
 subset(o, 
