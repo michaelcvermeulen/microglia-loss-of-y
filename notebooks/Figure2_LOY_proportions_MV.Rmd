@@ -40,7 +40,7 @@ filter_function <- function(min_cells=75, sum_Y=250,l ,
 ## cleans up 
   
 l[l$TOTAL_CELLS > min_cells & l$sum_Y_exp >= sum_Y, ] -> l
-l[l$cell_type%in%cell_type,] -> dat
+l[l$cell_type %in% cell_type,] -> dat
 dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
 dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
 dat[!grepl(dat$cohort, pattern = "PRJNA434002_cleaned_filtered"),] -> dat
@@ -1176,6 +1176,59 @@ lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA )
 ```
 
 
+```{r effect_of_QC_on_LOY_prop}
+output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+data.table::fread(paste0(output,"/LOY_prop_table_3500_1000.txt")) -> l
+filter_function(l = l, min_cells = 75, sum_Y = 0) -> dat
+
+
+dat[dat$cell_type %in% c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte"),] -> dat
+
+paste0(dat$sample, "_", dat$cohort) -> dat$ID
+
+
+dat %>% dplyr::mutate(diff_PAR = log1p((expr_PAR_LOY - expr_PAR) / expr_PAR)) -> dat
+
+
+# lm(data = dat[dat$cell_type], formula = LOY_prop ~ expr_Y + sum_Y_exp) %>% summary()
+ggscatter(data = dat, x = "expr_Y", y = "LOY_prop", color = "diff_PAR", 
+          facet.by = "cell_type", size = 1.5) + geom_smooth(se = F, method = "lm") + 
+          scale_color_viridis_c(direction = -1, limits = c(-0.4,0.4), oob = scales::squish) + 
+          coord_cartesian(ylim = c(0,0.6))
+
+
+ggscatter(data = dat, x = "sum_Y_exp", y = "LOY_prop", fill = "diff_PAR", shape = 21, stroke = 1,  
+          facet.by = "cell_type", size = 2) + geom_smooth(se = F, method = "lm") + 
+          scale_fill_viridis_c(direction = -1, limits = c(-0.4,0.4), oob = scales::squish, option = "B") + 
+          coord_cartesian(ylim = c(0,0.6)) 
+
+ggscatter(data = dat, x = "sum_Y_exp", y = "LOY_prop", fill = "diff_PAR", shape = 21, stroke = 1,  
+          facet.by = "cell_type", size = "LOY_cells") + geom_smooth(se = F, method = "lm") + 
+          scale_fill_viridis_c(direction = -1, limits = c(-0.4,0.4), oob = scales::squish, option = "B", end = 0.9) + 
+          coord_cartesian(ylim = c(0,0.6)) + geom_vline(xintercept = 250, color = "grey")
 
 
 
+
+output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+data.table::fread(paste0(output,"/LOY_prop_table_3500_1000.txt")) -> l
+filter_function(l = l, min_cells = 75, sum_Y = 250) -> dat
+dat[dat$cell_type %in% c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte"),] -> dat
+paste0(dat$sample, "_", dat$cohort) -> dat$ID
+
+
+dat %>% dplyr::mutate(diff_PAR = log1p((expr_PAR_LOY - expr_PAR) / expr_PAR)) -> dat
+ggscatter(data = dat[dat$donor_organism.age >= 0,], 
+          x = "donor_organism.age", y = "LOY_prop", fill = "diff_PAR", shape = 21, stroke = 1,  
+          facet.by = "cell_type", size = "LOY_cells") + geom_smooth(se = F, method = "lm") + 
+          scale_fill_viridis_c(direction = -1, limits = c(-0.4,0.4), oob = scales::squish, option = "B", end = 0.9) + 
+          coord_cartesian(ylim = c(0,0.6)) 
+
+
+
+dat %>% dplyr::filter(LOY_cells >= 20) -> dat
+dat[dat$expr_PAR_LOY > 0, ] -> dat
+dat[dat$expr_PAR > 1.5, ] -> dat
+
+
+```
