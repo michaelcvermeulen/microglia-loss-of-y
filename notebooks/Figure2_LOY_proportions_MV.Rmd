@@ -27,19 +27,20 @@ suppressPackageStartupMessages(library(EnsDb.Hsapiens.v86))
 edb <- EnsDb.Hsapiens.v86
 
 setwd("H:/LOY/scLOY/scLOY/")
-source("E:/LOY/Example/PACKAGE/call_LOY.R")
-source("E:/LOY/scLOY/scripts/loy_functions.R")
-source('H:/LOY/scLOY/scLOY/R/load.R')
-source('H:/LOY/scLOY/scLOY/data_raw/build_data_files.R')
-source("E:/LOY/scLOY/scripts/annotation_functions.R")
+source("E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/call_LOY.R")
+source("E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/loy_functions.R")
+source("E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/loy_summary_functions.R")
+source('E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/load.R')
+source('E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/build_data_files.R')
 
 
 
-filter_function <- function(min_cells=75, sum_Y=250,l ){
+filter_function <- function(min_cells=75, sum_Y=250,l , 
+                            cell_type = c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte")){
 ## cleans up 
   
 l[l$TOTAL_CELLS > min_cells & l$sum_Y_exp >= sum_Y, ] -> l
-l[l$cell_type%in%c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte"),] -> dat
+l[l$cell_type%in%cell_type,] -> dat
 dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
 dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
 dat[!grepl(dat$cohort, pattern = "PRJNA434002_cleaned_filtered"),] -> dat
@@ -250,22 +251,31 @@ dat[dat$LOY_prop > 0.25,]$cell_type %>% table()
 ```
 
 
+```{r diseases_included}
+
+
+
+
+
+
+```
+
+
+
+
+
+
 ```{r LOY_frequency_cell_type_barplot}
 
 ### LOY FREQUENCY BY CELL_TYPE BARPLOT ######
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
-l[l$TOTAL_CELLS > 75 & l$sum_Y_exp >= 250, ] -> l
-l[l$cell_type%in%c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte"),] -> dat
-dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
-dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
+filter_function(l = l, min_cells = 75, sum_Y = 250) -> dat
 
-
-
-factor(dat$cell_type, levels = c("Microglia","Pericyte","OPC","Oligodendrocyte","Astrocyte","Neuron"),
-       labels = c("Microglia","Pericyte","OPC","OL","Astrocyte","Neuron")) -> dat$cell_type
+factor(dat$cell_type, levels = c("Microglia","Pericyte", "OPC","Oligodendrocyte","Astrocyte","Neuron"),
+       labels = c("Microglia","OPC","OL","Astrocyte","Neuron")) -> dat$cell_type
 dat %>% dplyr::group_by(cell_type) %>% dplyr::summarise(LOY = sum(LOY_cells), NORMAL = sum(NORMAL_cells)) %>%
   dplyr::mutate(LOY_prop = LOY / (LOY + NORMAL), TOTAL = LOY + NORMAL) %>%
-  ggbarplot(x = "cell_type", y = "LOY_prop", palette = dittoSeq::dittoColors()[c(5,9,8,7,1,5)], fill = "cell_type") %>%
+  ggbarplot(x = "cell_type", y = "LOY_prop", palette = dittoSeq::dittoColors()[c(5,8,7,1,6)], fill = "cell_type") %>%
     ggpar(x.text.angle = 45, font.xtickslab = c(10,"bold"), ylab = "LOY proportion", xlab = "") %>% ggpar(legend = "none") -> p
 
 plots <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/MAIN/Fig2"
@@ -273,6 +283,8 @@ ggsave(plot = p,
        filename = paste0(plots,"/LOY_proportion_by_cell_type_sum.pdf"),
        dpi = "retina", units = "in", height = 3, width = 2)
 ```
+
+
 
 ```{r main_plots}
 ##### MAIN PLOTS ##############
@@ -515,18 +527,11 @@ tmp %>%
 ### CELLTYPE |  LOY | NEURO BROAD #########
 output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
-#data.table::fread(paste0(output,"/LOY_prop_table.txt")) -> l
-l[l$TOTAL_CELLS > 75 & l$sum_Y_exp > 250, ] -> dat
-dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
-dat[!grepl(dat$tissue, pattern = "Lung"),] -> dat
-dat[!grepl(dat$cohort, pattern = "PRJNA434002_cleaned_filtered"),] -> dat
-dat[!grepl(dat$cohort, pattern = "syn16780177_cleaned_filtered"),] -> dat
-dat[!grepl(dat$cohort, pattern = "syn22130805_cleaned_filtered"),] -> dat
+
+filter_function(l =l , min_cells = 75, sum_Y = 250) -> dat
 paste0(dat$sample, "_", dat$cohort) -> dat$ID
 gsub(pattern = "_cleaned_filtered", x = dat$cohort, replacement = "") -> dat$cohort
-dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
-dat[which(dat$sample=="Microglia_MO_MCI3"),]$neuro_degen_diagnosis <- "AD/MCI"
-dat[which(dat$neuro_degen_diagnosis=="AD"),]$neuro_degen_diagnosis <- "AD/MCI"
+
 
 
 
@@ -539,7 +544,7 @@ ifelse(dat$neuro_degen_diagnosis %in% c("AD/MCI","HD","PD","ALS","LBD/FTLD"),
        "Neurodegenerative disorder", "Control") -> dat$neuro_degen_diagnosis_broad
 
 ggboxplot(dat,
-          x = "cell_type", font.xtickslab = c(6), size = 0.2, outlier.size= 0.6, add = "jitter",
+          x = "cell_type", font.xtickslab = c(6), size = 0.2, outlier.size= 0.6, 
           xlab = "", ylab = "Loss of Y proportion", fill = "neuro_degen_diagnosis_broad", palette = "aaas",
           y = "LOY_prop") %>% ggpar(x.text.angle = 45, ylim = c(0,0.6), legend = "none") -> tmp
 ggsave(plot = tmp,
@@ -991,3 +996,186 @@ ggsave(plot = p,
             
             
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### other analyses
+# Reviewer comment 3.6
+
+```{r PAR_LOY_v_NORMAL}
+
+data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
+filter_function(l = l, min_cells = 75, sum_Y = 250, cell_type = l$cell_type %>% unique()) -> dat
+
+dat[dat$cell_type == "Monoycte",]$cell_type <- "Monocyte"
+
+paste0(dat$sample, "_", dat$cohort) -> dat$ID
+
+
+dat %>% dplyr::mutate(diff_PAR = log1p((expr_PAR_LOY - expr_PAR) / expr_PAR)) -> dat
+
+dat %>% dplyr::filter(LOY_cells >= 20) -> dat
+dat[dat$expr_PAR_LOY > 0, ] -> dat
+dat[dat$expr_PAR > 1.5, ] -> dat
+
+ggscatter(dat, x = "diff_PAR", y = "LOY_prop", color = "cell_type") %>%
+  ggpar(x.text.angle = 45, font.xtickslab = c(10,"bold"), ylab = "LOY proportion", xlab = "") %>% ggpar(legend = "none") -> p
+
+ggstripchart(dat, x = "cell_type", y = "diff_PAR", add = "mean_sd", add.params = list(color = "red"), 
+             size = "LOY_cells", shape = 21, fill = "blue", color = "black", stroke = 0.8) %>% 
+  ggpar(ylab = "logFC PAR (NORMAL v LOY)", xlab = "Cell type", font.xtickslab = c("bold",8),
+        x.text.angle = 45) + geom_hline(yintercept = 0) -> p 
+
+ggsave(plot = p, filename = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS_FOR_REVIEWERS/plots/PAR_logFC_stripchart.pdf",
+       dpi = "retina", width = 10, height = 6, units = "in"
+        
+      )
+
+dat$sample %>% unique %>% length
+dat$cell_type %>% unique %>% length
+
+
+
+
+###################################### 1500 ######
+data.table::fread(paste0(output,"/LOY_prop_table_1500_1000.txt")) -> l
+filter_function(l = l, min_cells = 75, sum_Y = 250, cell_type = l$cell_type %>% unique()) -> dat
+
+dat[dat$cell_type == "Monoycte",]$cell_type <- "Monocyte"
+
+paste0(dat$sample, "_", dat$cohort) -> dat$ID
+
+
+dat %>% dplyr::mutate(diff_PAR = log1p((expr_PAR_LOY - expr_PAR) / expr_PAR)) -> dat
+
+dat %>% dplyr::filter(LOY_cells >= 20) -> dat
+dat[dat$expr_PAR_LOY > 0, ] -> dat
+dat[dat$expr_PAR > 1.5, ] -> dat
+
+ggscatter(dat, x = "diff_PAR", y = "LOY_prop", color = "cell_type") %>%
+  ggpar(x.text.angle = 45, font.xtickslab = c(10,"bold"), ylab = "LOY proportion", xlab = "") %>% ggpar(legend = "none") -> p
+
+ggstripchart(dat, x = "cell_type", y = "diff_PAR", add = "mean_sd", add.params = list(color = "red"), 
+             size = "LOY_cells", shape = 21, fill = "blue", color = "black", stroke = 0.8) %>% 
+  ggpar(ylab = "logFC PAR (NORMAL v LOY)", xlab = "Cell type", font.xtickslab = c("bold",8),
+        x.text.angle = 45) + geom_hline(yintercept = 0) -> p 
+
+ggsave(plot = p, filename = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS_FOR_REVIEWERS/plots/PAR_logFC_stripchart_1500.pdf",
+       dpi = "retina", width = 10, height = 6, units = "in"
+        
+      )
+
+
+
+
+
+
+
+
+readRDS(file = "e:/LOY/scLOY/processed_seurat/BRAIN/GSE160936_AD_GLIAL_introns_included.RDS" ) -> o 
+
+## What is the PAR score for each cell type
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" ) -> o. 
+ggviolin(o.@meta.data, x = "cell_ident_MV", y = "normPAR", fill = "LOY", add = c("mean", "mean_sd")) %>% 
+  ggpar(legend.title = "LOY", ylab = "normPAR (log2)", palette = get_palette("aaas",2 )[c(2,1)],
+        xlab = "Cell type", x.text.angle = 45, font.xtickslab = c("bold",9))
+
+ggviolin(o.@meta.data, x = "cell_ident_MV", y = "PAR_score1", fill = "LOY", add = c("mean", "mean_sd")) %>% 
+  ggpar(legend.title = "LOY", ylab = "normPAR (log2)", palette = get_palette("aaas",2 )[c(2,1)],
+        xlab = "Cell type", x.text.angle = 45, font.xtickslab = c("bold",9)) -> p
+
+ggsave(plot = p, filename = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS_FOR_REVIEWERS/plots/normPAR_violin_SMITH_AM.pdf",
+       dpi = "retina", width = 10, height = 6, units = "in"
+        
+      )
+
+
+
+
+o@meta.data$`ptau immunostaining (%ptau positive cells):ch1` %>% as.numeric() -> o@meta.data$ptau
+o@meta.data$`braak tangle stage:ch1` %>% as.factor() -> o@meta.data$braak
+o@meta.data$`amyloid immunostaining (%area stained):ch1` %>% as.numeric() -> o@meta.data$amy
+
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Microglia" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Astro" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Pericyte" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Brain endothelial" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Oligo" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Neuron" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "CD4+ T" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "OPC" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Erythroid" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+
+
+
+
+
+readRDS(file = "e:/LOY/scLOY/processed_seurat/MERGED_COHORT/GSE178265_cleaned_filtered.RDS" ) -> o
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" ) -> o.
+
+ggviolin(o.@meta.data, x = "cell_ident_MV", y = "normPAR", fill = "LOY", add = c("mean", "mean_sd")) %>% 
+  ggpar(legend.title = "LOY", ylab = "normPAR (log2)", palette = get_palette("aaas",2 )[c(2,1)],
+        xlab = "Cell type", x.text.angle = 45, font.xtickslab = c("bold",9))
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Microglia" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA ) %>% summary()
+ifelse(o.@meta.data$LOY == "LOY", 1, 0) %>% as.factor() -> o.@meta.data$LOY_factor
+lm(data = o.@meta.data, formula = LOY_factor ~ PAR_score1 + nCount_RNA + nFeature_RNA ) %>% summary()
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Astro" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA ) %>% summary()
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Neuron" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA )  %>% summary()
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "OPC" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA ) %>% summary() 
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Pericyte" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA ) %>% summary() 
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Brain endothelial" ) -> o. 
+wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA ) %>% summary() 
+
+```
+
+
+
+
+
