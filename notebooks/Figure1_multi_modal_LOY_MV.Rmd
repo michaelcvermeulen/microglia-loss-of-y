@@ -28,11 +28,12 @@ suppressPackageStartupMessages(library(EnsDb.Hsapiens.v86))
 edb <- EnsDb.Hsapiens.v86
 
 setwd("H:/LOY/scLOY/scLOY/")
-source("E:/LOY/Example/PACKAGE/call_LOY.R")
-source("E:/LOY/scLOY/scripts/loy_functions.R")
-source('H:/LOY/scLOY/scLOY/R/load.R')
-source('H:/LOY/scLOY/scLOY/data_raw/build_data_files.R')
-source("E:/LOY/scLOY/scripts/annotation_functions.R")
+source("E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/call_LOY.R")
+source("E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/loy_functions.R")
+source("E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/loy_summary_functions.R")
+source('E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/load.R')
+source('E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/build_data_files.R')
+
 
 save <- F
 
