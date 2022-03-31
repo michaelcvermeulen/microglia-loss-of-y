@@ -33,6 +33,9 @@ source("E:/LOY/scLOY/scripts/loy_functions.R")
 source('H:/LOY/scLOY/scLOY/R/load.R')
 source('H:/LOY/scLOY/scLOY/data_raw/build_data_files.R')
 source("E:/LOY/scLOY/scripts/annotation_functions.R")
+
+save <- F
+
 ```
 
 ## Multi-modal LOY analysis (Fig 1)
@@ -83,8 +86,9 @@ dittoSeq::dittoDimPlot(object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 100
 
 p
 
+if(save == T){
 ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/CELL_TYPE_UMAP.pdf",
-       dpi = "retina", width = 4, height = 4, units = "in")
+       dpi = "retina", width = 4, height = 4, units = "in")}
 
 
 dittoSeq::dittoDimPlot(object = subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000), 
@@ -94,8 +98,9 @@ dittoSeq::dittoDimPlot(object = subset(o, nCount_RNA > 3000 & nFeature_RNA > 100
 
 p
 
+if(save == T){
 ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/CELL_TYPE_UMAP3000.pdf",
-       dpi = "retina", width = 4, height = 4, units = "in")
+       dpi = "retina", width = 4, height = 4, units = "in")}
 
 
 ```
@@ -124,8 +129,9 @@ DotPlot(object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000),
 
 p
 
+if(save == T){
 ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/DOTPLOT.pdf",
-       dpi = "retina", width = 7.74, height = 5, units = "in")
+       dpi = "retina", width = 7.74, height = 5, units = "in")}
 
 ```
 
@@ -142,8 +148,9 @@ dittoSeq::dittoDimPlot(object = subset(o, nCount_RNA > 3000 & nFeature_RNA > 100
                        color.panel = c("red","grey"),
                        order = c("decreasing")) %>% ggpar(title = "", legend = "none") + NoAxes() -> p
 
+if(save == T){
 ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_UMAP_3000UMI.pdf",
-       dpi = "retina", width = 3, height = 3, units = "in")
+       dpi = "retina", width = 3, height = 3, units = "in")}
 
 
 ### 1500
@@ -152,8 +159,9 @@ dittoSeq::dittoDimPlot(object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 100
                        color.panel = c("red","grey"),
                        order = c("decreasing")) %>% ggpar(title = "", legend = "none") + NoAxes() -> p
 
+if(save == T){
 ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_UMAP.pdf",
-       dpi = "retina", width = 3, height = 3, units = "in")
+       dpi = "retina", width = 3, height = 3, units = "in")}
 
 
 ## of all LOY nuclei, what proportion were found in the B tumor cluster.
@@ -178,8 +186,9 @@ p %>% ggpar(title = "", xlab = "Cell type", legend = "none", ylab = "Proportion 
 
 reshape2::dcast(data = p$data, formula = grouping ~ label)
 
+if(save == T){
 ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
-       dpi = "retina", width = 4, height = 4, units = "in")
+       dpi = "retina", width = 4, height = 4, units = "in")}
 
 
 dittoSeq::dittoBarPlot(object = subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000), 
@@ -191,8 +200,9 @@ p %>% ggpar(title = "", xlab = "Cell type", legend = "none", ylab = "Proportion 
 reshape2::dcast(data = p$data, formula = grouping ~ label)
 
 
+if(save == T){
 ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR_3000.pdf",
-       dpi = "retina", width = 4, height = 4, units = "in")
+       dpi = "retina", width = 4, height = 4, units = "in")}
 
 
 ### Using ATAC
@@ -269,15 +279,19 @@ return(list(p,df,k))
 }
 
 print_GEX_ATAC_LOY(o, UMI_RNA = 3000, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 1000) -> p;p[[1]]
+
+if(save == T){
 ggsave(plot = p[[1]], filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR_GEX_ATAC.pdf",
-       dpi = "retina", width = 4, height = 4, units = "in")
+       dpi = "retina", width = 4, height = 4, units = "in")}
 
 print_GEX_ATAC_LOY(o, UMI_RNA = 2000, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 2000)
 
 print_GEX_ATAC_LOY(o, UMI_RNA = 1500, Feature_RNA = 1000, UMI_ATAC = 10000, Feature_ATAC = 1500) -> p;p[[1]]
+
+if(save == T){
 ggsave(plot = p[[1]] %>% ggpar(legend = "none", x.text.angle = 45, font.xtickslab = c(10)), 
        filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR_GEX_ATAC_1500.pdf",
-       dpi = "retina", width = 4, height = 3, units = "in")
+       dpi = "retina", width = 4, height = 3, units = "in")}
 
 
 ### GEX / ATAC LOY agreement
@@ -491,8 +505,9 @@ dat$ATAC_gene_activity %>% as.data.frame() %>% tibble::rownames_to_column() %>% 
         font.xtickslab = c(10), font.y = c(12), font.ytickslab = c(10),
         legend = "none",orientation = "horizontal") -> p
 
+if(save == T){
 ggsave(filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/CHROM_ACCESS_chrY_genes.pdf", plot = p,
-       units = "in", width = 3, height = 3)
+       units = "in", width = 3, height = 3)}
 
 ```
 
@@ -521,8 +536,9 @@ ggpubr::ggline(l, x = "depth", y = "value", color = "variable", numeric.x.axis =
   ggpar(xlab = "UMI threshold (GEX)", font.y = c(11),
         ylab = "", palette = c("red","grey"), legend = "none") -> p
 
+if(save == T){
 ggsave(plot =p, units = "in", width = 3, height = 2.5, dpi = "retina",
-       filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/CHROM_ACCESS_ACROSS_UMI.pdf")
+       filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/CHROM_ACCESS_ACROSS_UMI.pdf")}
 
 
 
@@ -548,8 +564,9 @@ ggboxplot(o@meta.data[o@meta.data$nCount_RNA > 1500 & o@meta.data$nFeature_RNA >
           ggpar(p, ylab = "MSY gene activity (ATAC)", palette = c("red","grey"),
                 xlab = "", x.text.angle = 45, font.y = c(12), legend = "none", font.xtickslab = c(12,"bold")) -> p
 
+if(save == T){          
 ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_ATAC_GEX_BOXPLOT_1500.pdf",
-       dpi = "retina", width = 2, height = 3, units = "in")
+       dpi = "retina", width = 2, height = 3, units = "in")}
           
 
 o@meta.data[o@meta.data$nCount_RNA > 3000,] %>% 
@@ -564,17 +581,18 @@ ggboxplot(o@meta.data[o@meta.data$nCount_RNA > 1500 & o@meta.data$nFeature_RNA >
           ggpar(p, ylab = "MSY gene activity (ATAC)", palette = c("red","grey"),
                 xlab = "", x.text.angle = 45, font.y = c(12), legend = "none", font.xtickslab = c(12,"bold")) -> p
 
+if(save == T){          
 ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_ATAC_GEX_BOXPLOT_TUMOR_1500.pdf",
-       dpi = "retina", width = 2, height = 3, units = "in")
+       dpi = "retina", width = 2, height = 3, units = "in")}
 
 # 3000
 ggboxplot(o@meta.data[o@meta.data$nCount_RNA > 3000 & o@meta.data$nFeature_RNA > 1000 & o@meta.data$cell_ident_MV=="B tumor",],
           x = "LOY", y = "Norm_Access", fill = "LOY") -> p
           ggpar(p, ylab = "MSY gene activity (ATAC)", palette = c("red","grey"),
                 xlab = "", x.text.angle = 45, font.y = c(12), legend = "none", font.xtickslab = c(12,"bold")) -> p
-
+if(save == T){
 ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_ATAC_GEX_BOXPLOT_TUMOR_3000.pdf",
-       dpi = "retina", width = 2, height = 3, units = "in")
+       dpi = "retina", width = 2, height = 3, units = "in")}
 
 #ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
 #       dpi = "retina", width = 4, height = 4, units = "in")
@@ -590,10 +608,10 @@ ggdensity(data = o@meta.data[o@meta.data$nCount_RNA > 1500 &
           ggpar(p,legend.title = "LOY classification (GEX)",
                 title = "")  -> p1
           
-
+if(save == T){
 ggsave(plot = ggpar(p1, legend = "none"), 
        filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/DENSITY_GENE_ACTIVITY_ALL.pdf",
-       dpi = "retina", width = 4, height = 4, units = "in")
+       dpi = "retina", width = 4, height = 4, units = "in")}
 
 ggdensity(data = o@meta.data[o@meta.data$nCount_RNA > 1500 & 
                                o@meta.data$nFeature_RNA > 1000 & 
@@ -605,9 +623,10 @@ ggdensity(data = o@meta.data[o@meta.data$nCount_RNA > 1500 &
 
 p2
 
+if(save == T){
 ggsave(plot = ggpar(p2, legend = "none"), 
        filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/DENSITY_GENE_ACTIVITY_TUMOR.pdf",
-       dpi = "retina", width = 4, height = 4, units = "in")
+       dpi = "retina", width = 4, height = 4, units = "in")}
 
 
 
@@ -634,8 +653,10 @@ dittoSeq::dittoDimPlot(subset(o, nCount_RNA > 3000 & nCount_ATAC_gene_activity >
   scale_color_viridis_c(oob = scales::squish, limits = c(0,0.15)) -> out
 out %>% ggpar(legend = "none") -> out
 out
+
+if(save == T){
 ggsave(plot = out + NoAxes(), filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/GENE_ACTIVITY_UMAP_3000.pdf",
-       dpi = "retina", width = 4, height = 4, units = "in")
+       dpi = "retina", width = 4, height = 4, units = "in")}
 
 
 dittoSeq::dittoDimPlot(subset(o, nCount_ATAC_gene_activity > 10000), 
@@ -643,8 +664,11 @@ dittoSeq::dittoDimPlot(subset(o, nCount_ATAC_gene_activity > 10000),
   scale_color_viridis_c(oob = scales::squish, limits = c(0,0.15)) -> out
 
 out
-ggsave(plot = out %>% ggpar(legend = "none") + NoAxes(), filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/GENE_ACTIVITY_UMAP_1500.pdf",
-       dpi = "retina", width = 4, height = 4, units = "in")
+
+if(save == T){
+ggsave(plot = out %>% ggpar(legend = "none") + NoAxes(), 
+       filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/GENE_ACTIVITY_UMAP_1500.pdf",
+       dpi = "retina", width = 4, height = 4, units = "in")}
 
 
 subset(o,nCount_ATAC_gene_activity > 10000) -> tmp
@@ -735,8 +759,10 @@ p1 <- CoveragePlot(
 )
 
 p1
+
+if(save == T){
 ggsave(plot = p1, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/UTY_GENE_ACTIVITY.pdf",
-       dpi = "retina", width = 7, height = 7, units = "in")
+       dpi = "retina", width = 7, height = 7, units = "in")}
 
 #### S3B
 Idents(o) <- "LOY"
@@ -751,8 +777,10 @@ p2 <- CoveragePlot(
 )
 
 p2
+
+if(save == T){
 ggsave(plot = p2, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/ZFY_GENE_ACTIVITY.pdf",
-       dpi = "retina", width = 7, height = 7, units = "in")
+       dpi = "retina", width = 7, height = 7, units = "in")}
 
 
 
