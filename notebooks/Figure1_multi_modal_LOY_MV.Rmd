@@ -27,12 +27,7 @@ library(scDblFinder)
 suppressPackageStartupMessages(library(EnsDb.Hsapiens.v86))
 edb <- EnsDb.Hsapiens.v86
 
-setwd("H:/LOY/scLOY/scLOY/")
-source("E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/call_LOY.R")
-source("E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/loy_functions.R")
-source("E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/loy_summary_functions.R")
-source('E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/load.R')
-source('E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtools/build_data_files.R')
+devtools::source_url("https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/scripts/LOYtools/functions.R")
 
 
 save <- F
