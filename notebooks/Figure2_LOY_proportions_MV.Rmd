@@ -1087,16 +1087,24 @@ readRDS(file = "e:/LOY/scLOY/processed_seurat/BRAIN/GSE160936_AD_GLIAL_introns_i
 
 ## What is the PAR score for each cell type
 
-subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" ) -> o. 
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Neuron") -> o. 
+ggviolin(o.@meta.data, x = "cell_ident_MV", y = "PAR_score1", 
+         fill = "LOY", add = c("mean", "mean_sd")) %>% 
+  ggpar(legend.title = "LOY", legend = "bottom", ylab = "PAR gene module score", palette = get_palette("aaas",2 )[c(2,1)],
+        xlab = "Cell type", x.text.angle = 45, font.xtickslab = c("bold",9)) 
+        
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & specific_tissue == "EC" ) -> o. 
 ggviolin(o.@meta.data, x = "cell_ident_MV", y = "normPAR", fill = "LOY", add = c("mean", "mean_sd")) %>% 
   ggpar(legend.title = "LOY", ylab = "normPAR (log2)", palette = get_palette("aaas",2 )[c(2,1)],
         xlab = "Cell type", x.text.angle = 45, font.xtickslab = c("bold",9))
 
 ggviolin(o.@meta.data, x = "cell_ident_MV", y = "PAR_score1", fill = "LOY", add = c("mean", "mean_sd")) %>% 
-  ggpar(legend.title = "LOY", ylab = "normPAR (log2)", palette = get_palette("aaas",2 )[c(2,1)],
+  ggpar(legend.title = "LOY", ylab = "PAR gene module score", palette = get_palette("aaas",2 )[c(2,1)],
         xlab = "Cell type", x.text.angle = 45, font.xtickslab = c("bold",9)) -> p
 
-ggsave(plot = p, filename = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS_FOR_REVIEWERS/plots/normPAR_violin_SMITH_AM.pdf",
+ggsave(plot = p, 
+       filename = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS_FOR_REVIEWERS/plots/PAR_score_violin_SMITH_AM.pdf",
        dpi = "retina", width = 10, height = 6, units = "in"
         
       )
@@ -1108,9 +1116,92 @@ o@meta.data$`ptau immunostaining (%ptau positive cells):ch1` %>% as.numeric() ->
 o@meta.data$`braak tangle stage:ch1` %>% as.factor() -> o@meta.data$braak
 o@meta.data$`amyloid immunostaining (%area stained):ch1` %>% as.numeric() -> o@meta.data$amy
 
+# 
 
-subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Microglia" ) -> o. 
-wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+
+lapply(X = o@meta.data$cell_ident_MV %>% unique(), FUN =function(x){ 
+  
+  subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == x) -> o. 
+  factor(o.@meta.data$LOY, levels = c("NORMAL","LOY")) -> o.@meta.data$LOY_factor
+  ifelse(o.@meta.data$LOY == "LOY", 0, 1) %>% as.numeric() -> o.@meta.data$LOY_dummy
+  wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+  lm(data = o.@meta.data, formula = LOY_dummy ~ PAR_score1 + nCount_RNA + nFeature_RNA + percent.mt + percent.rb) %>% summary() -> p
+  p$coefficients %>% unlist() %>% as.data.frame()  -> df
+  df$cell_type <- x
+  rownames(df) -> df$factor
+  return(df) 
+
+}) -> l
+data.table::rbindlist(l) -> l 
+
+
+-log10(l$`Pr(>|t|)`) -> l$logP
+
+reshape2::dcast(data = l, formula = cell_type ~ factor, value.var = "Pr(>|t|)") -> a
+reshape2::dcast(data = l, formula = cell_type ~ factor, value.var = "t value") -> b
+reshape2::dcast(data = l, formula = cell_type ~ factor, value.var = "logP") -> c
+
+c[,-2] -> c 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+lapply(X = o@meta.data$cell_ident_MV %>% unique(), FUN =function(x){ 
+  
+  subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == x) -> o. 
+  factor(o.@meta.data$LOY, levels = c("NORMAL","LOY")) -> o.@meta.data$LOY_factor
+  ifelse(o.@meta.data$LOY == "LOY", 0, 1) %>% as.numeric() -> o.@meta.data$LOY_dummy
+  wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
+  lm(data = o.@meta.data, formula = PAR_score1 ~ LOY_factor + nCount_RNA + nFeature_RNA + percent.mt + percent.rb) %>% summary() -> p
+  p$coefficients %>% unlist() %>% as.data.frame()  -> df
+  df$cell_type <- x
+  rownames(df) -> df$factor
+  return(df) 
+
+}) -> l
+data.table::rbindlist(l) -> l 
+
+subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Astro") -> o. 
+factor(o.@meta.data$LOY, levels = c("NORMAL","LOY")) -> o.@meta.data$LOY_factor
+ggscatter(data = o.@meta.data, y = "PAR_score1", x = "LOY_factor") 
+ggscatter(data = o.@meta.data, y = "PAR_score1", x = "nCount_RNA", add = "reg.line", facet.by = "LOY") + stat_cor() 
+
+-log10(l$`Pr(>|t|)`) -> l$logP
+
+reshape2::dcast(data = l, formula = cell_type ~ factor, value.var = "Pr(>|t|)") -> a
+reshape2::dcast(data = l, formula = cell_type ~ factor, value.var = "t value") -> b
+reshape2::dcast(data = l, formula = cell_type ~ factor, value.var = "logP") -> c
+
+c[,-2] -> c 
+
+
+pheatmap::pheatmap(mat = as.matrix(b %>% tibble::column_to_rownames(var = "cell_type")), display_numbers = T)
+
+
+as.matrix(c %>% tibble::column_to_rownames(var = "cell_type")) -> mat
+colnames(mat)[1] <- "LOY"
+ifelse(test = mat >= 4, yes = "***", 
+                        no = ifelse(mat >= 3, yes =  "**", no = 
+                               ifelse(test = mat >= 2, 
+                                      yes = "*", no = "ns"))) -> sig
+
+as.matrix(c %>% tibble::column_to_rownames(var = "cell_type")) -> mat
+names(mat) <- "LOY"
+          
+breaksList = seq(0, 20, by = 0.01)
+pheatmap::pheatmap(mat = mat, 
+                   display_numbers = sig, breaks = breaksList , 
+                   color = colorRampPalette(brewer.pal(n = 8, name = "Reds"))(length(breaksList)))
 
 subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Astro" ) -> o. 
 wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
@@ -1143,39 +1234,62 @@ wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.da
 readRDS(file = "e:/LOY/scLOY/processed_seurat/MERGED_COHORT/GSE178265_cleaned_filtered.RDS" ) -> o
 subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" ) -> o.
 
-ggviolin(o.@meta.data, x = "cell_ident_MV", y = "normPAR", fill = "LOY", add = c("mean", "mean_sd")) %>% 
-  ggpar(legend.title = "LOY", ylab = "normPAR (log2)", palette = get_palette("aaas",2 )[c(2,1)],
-        xlab = "Cell type", x.text.angle = 45, font.xtickslab = c("bold",9))
+ggviolin(o.@meta.data, x = "cell_ident_MV", y = "PAR_score1", fill = "LOY", add = c("mean", "mean_sd")) %>% 
+  ggpar(legend.title = "LOY", ylab = "PAR gene module score", palette = get_palette("aaas",2 )[c(2,1)],
+        xlab = "Cell type", x.text.angle = 45, font.xtickslab = c("bold",9)) -> p 
+
+ggsave(plot = p, 
+       filename = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS_FOR_REVIEWERS/plots/PAR_score_violin_GSE178265.pdf",
+       dpi = "retina", width = 10, height = 6, units = "in"
+        
+      )
 
 subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Microglia" ) -> o. 
 wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
 lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA ) %>% summary()
-ifelse(o.@meta.data$LOY == "LOY", 1, 0) %>% as.factor() -> o.@meta.data$LOY_factor
-lm(data = o.@meta.data, formula = LOY_factor ~ PAR_score1 + nCount_RNA + nFeature_RNA ) %>% summary()
+ifelse(o.@meta.data$LOY == "LOY", 1, 0) %>% as.numeric() -> o.@meta.data$LOY_factor
+lm(data = o.@meta.data, formula = LOY_factor ~ PAR_score1 + nCount_RNA + nFeature_RNA + percent.mt + percent.rb ) %>% summary() -> s
 
 subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Astro" ) -> o. 
 wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
 lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA ) %>% summary()
+ifelse(o.@meta.data$LOY == "LOY", 1, 0) %>% as.numeric() -> o.@meta.data$LOY_factor
+lm(data = o.@meta.data, formula = LOY_factor ~ PAR_score1 + nCount_RNA + nFeature_RNA + percent.mt + percent.rb ) %>% summary() -> s
 
 subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Neuron" ) -> o. 
 wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
 lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA )  %>% summary()
+ifelse(o.@meta.data$LOY == "LOY", 1, 0) %>% as.numeric() -> o.@meta.data$LOY_factor
+lm(data = o.@meta.data, formula = LOY_factor ~ PAR_score1 + nCount_RNA + nFeature_RNA + percent.mt + percent.rb ) %>% summary() -> s
+s$coefficients
 
 subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "OPC" ) -> o. 
 wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
 lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA ) %>% summary() 
+ifelse(o.@meta.data$LOY == "LOY", 1, 0) %>% as.numeric() -> o.@meta.data$LOY_factor
+lm(data = o.@meta.data, formula = LOY_factor ~ PAR_score1 + nCount_RNA + nFeature_RNA + percent.mt + percent.rb ) %>% summary() -> s
+s$coefficients
 
 subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Pericyte" ) -> o. 
 wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
 lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA ) %>% summary() 
+ifelse(o.@meta.data$LOY == "LOY", 1, 0) %>% as.numeric() -> o.@meta.data$LOY_factor
+lm(data = o.@meta.data, formula = LOY_factor ~ PAR_score1 + nCount_RNA + nFeature_RNA + percent.mt + percent.rb ) %>% summary() -> s
+s$coefficients
 
 subset(o, nCount_RNA > 3000 & nFeature_RNA > 1000 & donor_organism.sex == "male" & cell_ident_MV == "Brain endothelial" ) -> o. 
 wilcox.test(x = o.@meta.data[o.@meta.data$LOY == "LOY",]$normPAR, y = o.@meta.data[o.@meta.data$LOY == "NORMAL",]$normPAR)
 lm(data = o.@meta.data, formula = PAR_score1 ~ LOY + nCount_RNA + nFeature_RNA ) %>% summary() 
+ifelse(o.@meta.data$LOY == "LOY", 1, 0) %>% as.numeric() -> o.@meta.data$LOY_factor
+lm(data = o.@meta.data, formula = LOY_factor ~ PAR_score1 + nCount_RNA + nFeature_RNA + percent.mt + percent.rb ) %>% summary() -> s
+s$coefficients
 
 ```
 
 
+
+
+##### OTHER analyses 
 ```{r effect_of_QC_on_LOY_prop}
 output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
 data.table::fread(paste0(output,"/LOY_prop_table_3500_1000.txt")) -> l
