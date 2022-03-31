@@ -36,17 +36,12 @@ source('E:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/scripts/LOYtool
 
 
 filter_function <- function(min_cells=75, sum_Y=250,l , 
-                            cell_type = c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte")){
+                            type = c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte")){
 ## cleans up 
   
 l[l$TOTAL_CELLS > min_cells & l$sum_Y_exp >= sum_Y, ] -> l
-l[l$cell_type %in% cell_type,] -> dat
+l[l$cell_type %in% type,] -> dat
 dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
-dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
-dat[!grepl(dat$cohort, pattern = "PRJNA434002_cleaned_filtered"),] -> dat
-dat[!grepl(dat$cohort, pattern = "syn16780177_cleaned_filtered"),] -> dat
-dat[!grepl(dat$cohort, pattern = "syn22130805_cleaned_filtered"),] -> dat
-
 dat[!grepl(dat$tissue, pattern = "Lung"),] -> dat
 dat[which(dat$sample=="Microglia_MO_MCI3"),]$neuro_degen_diagnosis <- "AD/MCI"
 dat[which(dat$neuro_degen_diagnosis=="AD"),]$neuro_degen_diagnosis <- "AD/MCI"
@@ -80,7 +75,7 @@ save <- F
 
 ### TOTAL CELLS IN STUDY (PRE FILTER)
 
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_1500_1000.txt")) -> l
 
 filter_function(min_cells = 0, sum_Y = 0, l = l) -> dat
@@ -114,7 +109,7 @@ paste0("This includes all CNS cells/nuclei with >1500 UMI and >1000 genes")
 
 ```{r quality_control_metrics}
 
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
 
 filter_function(min_cells = 0, sum_Y = 0, l = l) -> dat
@@ -138,7 +133,7 @@ ggscatter(dat, x = "TOTAL_CELLS", y = "LOY_prop", facet.by = "cell_type", size =
  
  
 ## 
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_1500_1000.txt")) -> l
 
 filter_function(min_cells = 75, sum_Y = 250, l = l) -> dat
@@ -158,7 +153,7 @@ ggscatter(dat, x = "median_nUMI_NORMAL", y = "LOY_prop", facet.by = "cell_type",
 ```{r post_filter_stats}
 ### TOTAL CELLS IN STUDY (POST FILTER)
 
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
 
 filter_function(min_cells = 75, sum_Y = 250, l = l) -> dat
@@ -437,7 +432,7 @@ ggsave(plot = tmp,
 
 ##### AGE + CELL TYPE | LOY #######
 
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
 filter_function(l = l, min_cells = 75, sum_Y = 250) -> dat
 dat[!is.na(dat$donor_organism.age),] -> tmp
@@ -491,7 +486,7 @@ ggscatter(tmp,x = "donor_organism.age", y = "LOY_prop", add = "reg.line", size =
 
 
 #### AGE SCATTER #############
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
 filter_function(l=l, min_cells = 75, sum_Y = 250) -> dat
 
@@ -525,7 +520,7 @@ tmp %>%
 
 
 ### CELLTYPE |  LOY | NEURO BROAD #########
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
 
 filter_function(l =l , min_cells = 75, sum_Y = 250) -> dat
@@ -787,7 +782,7 @@ lm(data = dat[dat$cell_type %in% c("Microglia","Astrocyte"),], formula = LOY_pro
 
 ```{r fig2c}
 plots <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/MAIN/Fig2"
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
 filter_function(l = l, min_cells = 75, sum_Y = 250) -> dat
 factor(x = dat$cell_type, levels = c("Microglia","OPC","Oligodendrocyte","Astrocyte","Neuron"),
@@ -848,7 +843,7 @@ dat[dat$neuro_degen_diagnosis %in% c("Control","AD/MCI"),] %>%
 
 ```{r fig2_supp_age_dist}
 
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
 filter_function(l = l, min_cells = 75, sum_Y_ex = 250) -> dat
 factor(x = dat$cell_type, levels = c("Microglia","OPC","Oligodendrocyte","Astrocyte","Neuron"),
@@ -898,7 +893,7 @@ ggsave(plot = p,
 ```{r fig2_age_scatter}
 
 #### AGE SCATTER #############
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
 filter_function(l, min_cells = 75, sum_Y_exp = 250 ) -> dat
 
@@ -940,7 +935,7 @@ ggsave(plot = p,
 
 ```{r total_LOY_boxplots}
 
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_3000_1000.txt")) -> l
 #data.table::fread(paste0(output,"/LOY_prop_table.txt")) -> l
 l[l$TOTAL_CELLS > 50 & l$sum_Y_exp > 200, ] -> dat
@@ -1289,9 +1284,9 @@ s$coefficients
 
 
 
-##### OTHER analyses 
+##### OTHER analyses
 ```{r effect_of_QC_on_LOY_prop}
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_3500_1000.txt")) -> l
 filter_function(l = l, min_cells = 75, sum_Y = 0) -> dat
 
@@ -1324,7 +1319,7 @@ ggscatter(data = dat, x = "sum_Y_exp", y = "LOY_prop", fill = "diff_PAR", shape 
 
 
 
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "e:/LOY/scLOY/GR_LOY_microglia_github/microglia-loss-of-y/data/LOY_tables/"
 data.table::fread(paste0(output,"/LOY_prop_table_3500_1000.txt")) -> l
 filter_function(l = l, min_cells = 75, sum_Y = 250) -> dat
 dat[dat$cell_type %in% c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte"),] -> dat
