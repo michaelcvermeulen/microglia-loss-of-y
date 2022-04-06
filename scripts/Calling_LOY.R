@@ -12,13 +12,9 @@ library(scDblFinder)
 suppressPackageStartupMessages(library(EnsDb.Hsapiens.v86))
 edb <- EnsDb.Hsapiens.v86
 
-setwd("H:/LOY/scLOY/scLOY/")
-source("E:/LOY/Example/PACKAGE/call_LOY.R")
-source("E:/LOY/scLOY/scripts/loy_functions.R")
-source("E:/LOY/scLOY/scripts/loy_summary_functions.R")
-source('H:/LOY/scLOY/scLOY/R/load.R')
-source('H:/LOY/scLOY/scLOY/data_raw/build_data_files.R')
 
+source("E:/LOY/scLOY/scripts/annotation_functions.R")
+devtools::source_url("https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/scripts/LOYtools/functions.R")
 
 ### call LOY stats across all merged cohorts
 ### Seurat objects used for this LOY analysis are available upon request. 
@@ -27,7 +23,7 @@ source('H:/LOY/scLOY/scLOY/data_raw/build_data_files.R')
 ## build stats files
 files <- list.files(path = "e:/LOY/scLOY/processed_seurat/MERGED_COHORT/", full.names = T, recursive = T)
 nFeature <- 1000
-meta_output <- "e:/LOY/scLOY/results/LOY_DE/STATS_JULY21/"
+meta_output <- "e:/LOY/scLOY/results/LOY_DE/APRIL5/"
 
 for(i in files){
   readRDS(i) -> oo
@@ -54,8 +50,6 @@ for(i in files){
     for(sam in samples){
       tryCatch({
         
-        
-        
         for(it in seq(1500, 5000, 500)){
           call_stats(s_obj = obj,
                      cell_type = j,
@@ -65,7 +59,7 @@ for(i in files){
           
           data.table::fwrite(file = paste0(dir_name, "/",sam,
                                            "_samples_stat_",
-                                           obj@meta.data$GEO %>% unique(),
+                                           paste0(obj@meta.data$GEO %>% unique()),
                                            "_",it,"_",nFeature,"_",j,
                                            ".csv"),
                              sep = ",", x = stats)
@@ -130,11 +124,11 @@ for(i in files){
   }
 }
 
-output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES"
+output <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/COMPARE_CELL_TYPES_2"
 for(d in c(1500,2000,2500,3000,3500,4000,4500,5000)){
   message(d)
   # read in stats files
-  list.files(path = "e:/LOY/scLOY/results/LOY_DE/STATS_JULY21",
+  list.files(path = "e:/LOY/scLOY/results/LOY_DE/APRIL5/",
              recursive = T,
              pattern = paste0(d,"_1000"), full.names = T) -> files
   
@@ -159,7 +153,7 @@ for(d in c(1500,2000,2500,3000,3500,4000,4500,5000)){
   
   l[l$diagnosis=="PN",]$CLEAN <- "Control"
   
-  l[l$CLEAN %in% c("Non-disease control",
+  l[l$CLEAN %in% c("Non-disease control","Non-symptomatic",
                    "Control","COVID-19_Moderate","MDD",
                    "Control epilepsy", "Suicide","TLE","Donation after circulatory death",
                    "Healthy","Healthy control","Influenza patient","Bronchitis","Intracranial haemorrage",
@@ -168,7 +162,10 @@ for(d in c(1500,2000,2500,3000,3500,4000,4500,5000)){
   
   l[l$CLEAN %in% c("Unknown","Not listed","unknown")]$CLEAN <- "Unknown"
   l[is.na(l$CLEAN),]$CLEAN <- "Unknown"
-  l[!(l$CLEAN %in% c("Unknown","Control")),]$CLEAN <- "Disease state"
+  
+  l[l$CLEAN %in% c("Alzheimer's disease")]$CLEAN <- "AD"
+  
+  
   l$donor_organism.age %>% as.numeric() -> l$donor_organism.age
   
   
@@ -199,6 +196,8 @@ for(d in c(1500,2000,2500,3000,3500,4000,4500,5000)){
   l[l$neuro_degen_diagnosis=="LBD",]$neuro_degen_diagnosis <- "LBD/FTLD"
   l[l$neuro_degen_diagnosis=="IPD",]$neuro_degen_diagnosis <- "PD"
   l[l$neuro_degen_diagnosis=="FTLD",]$neuro_degen_diagnosis <- "LBD/FTLD"
+  l[l$neuro_degen_diagnosis=="AD/CAA",]$neuro_degen_diagnosis <- "AD"
+  l[l$neuro_degen_diagnosis=="AD/TLBD",]$neuro_degen_diagnosis <- "AD"
   
   data.table::fwrite(x= l, file = paste0(output,"/LOY_prop_table_",d,"_1000.txt"), sep = "\t")
   
