@@ -80,7 +80,7 @@ LOY_genes_to_exclude_expr <- function(s_obj, pct.exp = 0.05, avg.exp = 0.05){
   s_obj[["RNA"]]@data -> mat
   Y <- unique(Y_scLOY_genes[Y_scLOY_genes$gene_name %in% rownames(mat),]$gene_name)
   
-  Idents(s_obj) <- "donor_organism.sex"
+  Seurat::Idents(s_obj) <- "donor_organism.sex"
   DotPlot(s_obj, features = Y) -> p
   
   p$data[p$data$id == "male", ] -> dat
