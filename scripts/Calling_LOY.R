@@ -154,7 +154,7 @@ for(d in c(1500,2000,2500,3000,3500,4000,4500,5000)){
   l[l$diagnosis=="PN",]$CLEAN <- "Control"
   
   l[l$CLEAN %in% c("Non-disease control","Non-symptomatic",
-                   "Control","COVID-19_Moderate","MDD",
+                   "Control","COVID-19_Moderate","MDD","Cancer","Epilepsy",
                    "Control epilepsy", "Suicide","TLE","Donation after circulatory death",
                    "Healthy","Healthy control","Influenza patient","Bronchitis","Intracranial haemorrage",
                    "healthy control","none","control","Ctrl","Healthy_Healthy",
