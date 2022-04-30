@@ -28,7 +28,7 @@ edb <- EnsDb.Hsapiens.v86
 devtools::source_url("https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/scripts/LOYtools/functions.R")
 
 # filters LOY tables
-filter_function <- function(min_cells=50, score = -1.25,l , 
+filter_function <- function(min_cells=100, score = -1.25,l , 
                             type = c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte")){
 ## cleans up 
   
@@ -51,6 +51,13 @@ scale(x) -> dat$expr_Y_scaled
 dplyr::mutate(.data = dat, scaled_Y_metric  = (sum_Y_exp_scaled*1.5 + expr_Y_scaled*1) / 2) -> dat
 
 dat[dat$sum_Y_exp_scaled >= score,] -> dat
+
+dat$LOY_percent <- dat$LOY_prop * 100
+loess(formula = LOY_percent ~ sum_Y_exp_scaled, dat) -> m
+
+dat$predicted <- predict(m)   # Save the predicted values
+dat$residuals <- residuals(m) # Save the residual values
+
 return(dat)
   
 }
@@ -84,17 +91,18 @@ save <- F
 ### TOTAL CELLS IN STUDY (PRE FILTER)
 
 readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_1500_1000.txt") %>%
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
    as.data.table() -> l
 
-filter_function(min_cells = 0, score = -2, l = l) -> dat
+filter_function(min_cells = 0, score = -10, l = l, type = c("Astrocyte","Neuron","OPC","Microglia","Monocyte",
+                                                             "Oligodendrocyte","Pericyte","CAM","Fibroblast")) -> dat
 paste0(dat$sample, "_", dat$cohort) -> dat$ID
 gsub(pattern = "_cleaned_filtered", x = dat$cohort, replacement = "") -> dat$cohort
 
 dat %>% dplyr::group_by(cohort) %>% dplyr::summarise(`Total cells`=sum(TOTAL_CELLS)) -> out
 
 if(save == T){
-data.table::fwrite(x = out, file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/TABLES/UPDATED_MALE_CELLS_1500.csv")}
+data.table::fwrite(x = out, file = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/TABLES/PRE_FILTER_MALE_CELLS_3000.csv")}
 
 ## how many samples w/ LOY
 dat %>% dplyr::group_by(ID) %>% dplyr::summarise(mean = mean(LOY_prop)) -> out.
@@ -109,21 +117,75 @@ dat %>% group_by(cohort, sample) %>% summarize(n = dplyr::n(), age = mean(donor_
 tmp$sample %>% length() -> s
 
 paste0("Before filtering our dataset was comprised of ", cells, " cells/nuclei from ", s, " donors")
-paste0("This includes all CNS cells/nuclei with >1500 UMI and >1000 genes")
+paste0("This includes all CNS cells/nuclei with >3000 UMI and >1000 genes")
 
 
 
 ```
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-```{r SuppX_min_Yexpr_threshold}
+
+```{r confounders}
+
+data.table::fread("a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/DATA/ALL/LOY_prop_table_3000_1000_.txt") -> l
+filter_function(min_cells = 100, score = -2, l = l) -> dat
+
+dat$cell_type %>% table > 10 -> k
+k[k==T] %>% names() -> ct
+
+dat[dat$cell_type%in%ct,] -> dat
+
+
+
+dat[!(dat$tissue %in% c("mBrain tumor","tumor tissue")),] -> dat
+
+dat[dat$residuals < 0,]$residuals <- 0
+
+dat[dat$cell_type %in% c("Microglia","Neuron","Astrocyte","Oligodendrocyte","OPC"),] -> dat
+
+ggscatter(data = dat, x = "sum_Y_exp_scaled", y = "LOY_percent") + geom_smooth()
+
+ggboxplot(data = dat, x = "cell_type",y = "residuals", ylab = "Adjusted LOY (%)", add = "jitter")
+
+ggscatter(data = dat, x = "donor_organism.age" , y = "residuals", size = 0.8,
+          facet.by = "cell_type") + 
+  geom_smooth(method = "lm",se = F) + stat_cor()
+
+ggscatter(data = dat[dat$CLEAN=="Non-degenerative",], x = "donor_organism.age" , y = "residuals", size = 0.8,
+          facet.by = "cell_type") + 
+  geom_smooth(method = "lm",se = F) + stat_cor()
+
+ifelse(dat$CLEAN == "AD", 1,0) %>% as.factor() -> dat$AD
+dat$OTHER <- "o"
+dat[dat$CLEAN == "AD",]$OTHER <- "AD"
+dat[dat$CLEAN == "Non-degenerative",]$OTHER <- "Control"
+dat[!(dat$CLEAN %in% c("AD","Non-degenerative")),]$OTHER <- "OtherNeuro"
+factor(x = dat$OTHER, levels = c("Control","AD","OtherNeuro")) -> dat$OTHER
+
+dat %>% 
+  ggboxplot(color = "OTHER", y = "residuals", x = "cell_type", add = "jitter") -> p
+p$data %>% group_by(cell_type) %>% summarize(mean = mean(residuals))
+
+lm(data = dat[dat$cell_type=="Microglia" & dat$OTHER == "Control",], 
+   formula = residuals ~ median_nUMI_NORMAL + donor_organism.age) %>% summary()
+
+hist(dat$residuals, breaks = 200)
+
+```
+
+
+
+
+
+
+```{r Supplemental_MethodsX_min_Yexpr_threshold}
 
 
 readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
    as.data.table() -> l
 
-filter_function(min_cells = 100, score = -10, l = l,
+filter_function(min_cells = 100, score = -2, l = l,
                 type = c("Astrocyte","Neuron","OPC","Microglia","Oligodendrocyte","Pericyte","CAM","Monocyte","Fibroblast")) -> dat
 paste0(dat$sample, "_", dat$cohort) -> dat$ID
 gsub(pattern = "_cleaned_filtered", x = dat$cohort, replacement = "") -> dat$cohort
@@ -141,6 +203,15 @@ ggscatter(dat, x = "sum_Y_exp_scaled", y = "LOY_percent", size = 0.9, color = "c
         ylab = "Loss of Y (%)") + geom_vline(xintercept = -1.25) -> p
   p + geom_smooth(se = T) -> p
   
+
+dat$LOY_percent <- dat$LOY_prop * 100 %>% as.numeric()
+ggscatter(dat, x = "sum_Y_exp_scaled", y = "LOY_percent", size = 0.9, color = "cell_type", facet.by = "cell_type") -> p 
+  ggpar(p, xlab = "ChrY exp sparsity score (chrY-wt populations)", legend.title = "Cell type", palette = dittoColors(), legend = "bottom",
+        ylab = "Loss of Y (%)") + geom_vline(xintercept = -1.75) -> p
+  p + geom_smooth(se = F) -> p
+
+
+
 if(save == T){
 ggsave(plot = p, file = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS/Supp_QC/chrY_sparsity_threshold.pdf",
        dpi = "retina",units = "in", width = 7, height = 5)}
@@ -166,13 +237,57 @@ ggscatter(dat, x = "TOTAL_CELLS", y = "LOY_prop", facet.by = "cell_type", size =
 ```  
   
 
-```{r SuppX_panel_thresholds}
+#### Residuals (adjusted LOY)
+```{r}
+ggplot(dat, aes(x = sum_Y_exp_scaled, y =LOY_percent, color = cell_type) ) +
+  geom_point() + 
+  geom_segment(aes(xend = sum_Y_exp_scaled, yend = predicted, color = "cell_type"), alpha = .2) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue", ) +  # Plot
+  theme_bw() + rremove("grid") -> p 
+  ggpar(p, palette = "npg")
+
+dat %>% group_by(cell_type) %>% summarize(mean = mean(residuals))
+
+
+ifelse(dat$CLEAN == "AD", 1,0) %>% as.factor() -> dat$AD
+dat$OTHER <- "o"
+dat[dat$CLEAN == "AD",]$OTHER <- "AD"
+dat[dat$CLEAN == "Non-degenerative",]$OTHER <- "Control"
+dat[!(dat$CLEAN %in% c("AD","Non-degenerative")),]$OTHER <- "OtherNeuro"
+factor(x = dat$OTHER, levels = c("Control","AD","OtherNeuro")) -> dat$OTHER
+
+cut(x = dat$donor_organism.age, breaks = c(-1,60,80,100),
+    labels = c("0-59","60-79","80-100")) -> dat$quantile_age
+
+
+ggscatter(data = dat, x = "donor_organism.age", y = "residuals", facet.by = "cell_type", size = 0.5) + stat_cor()
+ggboxplot(data = dat[dat$cell_type %in% c("Astrocyte","Neuron","Oligodendrocyte","OPC","Microglia")] , 
+          x = "cell_type", y = "residuals", color = "OTHER", add = "jitter")      
+
+ggboxplot(data = dat[dat$cell_type %in% c("Astrocyte","Neuron","Oligodendrocyte","OPC","Microglia") & !is.na(dat$donor_organism.age),] , 
+          x = "cell_type", y = "residuals", color = "quantile_age", add = "jitter")   
+
+
+
+dat[dat$cell_type=="Microglia",] -> dat.
+ggscatter(data = dat., x = "donor_organism.age", y = "residuals") + geom_smooth(method = "lm") + stat_cor()
+ggscatter(data = dat., x = "donor_organism.age", ylab = "Adjusted LOY percent", 
+          y = "residuals", facet.by = "CLEAN") + geom_smooth(method = "lm") + stat_cor()
+
+dat[dat$cell_type%in%c("Microglia","OPC"),] -> dat.
+wilcox.test(residuals ~ cell_type, data = dat. )
+
+
+
+```
+
+```{r Supplemental_MethodsX_panel_thresholds}
   
 readr::read_csv(
-"https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+"https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
 as.data.table() -> l
 
-filter_function(min_cells = 0, score = -1.25, l = l,type = c("Astrocyte","Neuron","OPC","Microglia",
+filter_function(min_cells = 0, score = -1.75, l = l,type = c("Astrocyte","Neuron","OPC","Microglia",
                                                              "Oligodendrocyte","Pericyte","CAM","Fibroblast")) -> dat
 
 
@@ -199,7 +314,7 @@ gsub(pattern = "_cleaned_filtered", x = dat$cohort, replacement = "") -> dat$coh
 dat$LOY_percent <- dat$LOY_prop * 100 %>% as.numeric()
 gghistogram(dat, x = "sum_Y_exp", facet.by = "cell_type")
 ggscatter(dat, x = "sum_Y_exp_scaled", y = "LOY_percent", facet.by = "cell_type", size = 0.4) -> p 
-  ggpar(p, xlab = "ChrY exp sparsity score (chrY-wt populations)", ylab = "Loss of Y (%)") + geom_vline(xintercept = -1.25) -> p
+  ggpar(p, xlab = "ChrY exp sparsity score (chrY-wt populations)", ylab = "Loss of Y (%)") + geom_vline(xintercept = -1.75) -> p
   
   
 dat$LOY_percent <- dat$LOY_prop * 100 %>% as.numeric()
@@ -227,10 +342,11 @@ ggsave(plot = p3, file = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLO
 ### TOTAL CELLS IN STUDY (POST FILTER)
 
 readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
    as.data.table() -> l
 
-filter_function(min_cells = 75, sum_Y = 250, l = l) -> dat
+filter_function(min_cells = 100, score = -10, l = l, 
+                type = c("Astrocyte","Neuron","OPC","Microglia","Oligodendrocyte","Pericyte","CAM","Monocyte","Fibroblast")) -> dat
 paste0(dat$sample, "_", dat$cohort) -> dat$ID
 gsub(pattern = "_cleaned_filtered", x = dat$cohort, replacement = "") -> dat$cohort
 
@@ -239,14 +355,14 @@ dat %>% dplyr::group_by(cohort) %>% dplyr::summarise(`Total cells`=sum(TOTAL_CEL
 paste0("We applied strict QC filtering to our dataset to isolate high-information cells/nuclei ",
 "allowing for more reliable loss of chrY calling")
 
-paste0("Cells/nuclei were included if they had >3000 UMI counts and >1000 genes")
-paste0("Cell type clusters from individual samples were included if total cells/nuclei >75")
+paste0("Cells/nuclei were included if they had >= 3000 UMI counts and >= 1000 genes")
+paste0("Cell type clusters from individual samples were included if total cells/nuclei >= 100")
 paste0("We also tested chrY expression in non-LOY nuclei in each cell type population in each sample")
 paste0("Cell type populations in specific samples were removed ",
        "if MSY genes were not significantly expressed in WT (non-LOY) male cells.")
 
 if(save == T){
-data.table::fwrite(x = out, file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/TABLES/UPDATED_MALE_CELLS_1500.csv")}
+data.table::fwrite(x = out, file = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/TABLES/POST_FILTER_MALE_CELLS_3000_filtered.csv")}
 
 ## how many samples w/ LOY
 #dat %>% dplyr::group_by(ID) %>% dplyr::summarise(mean = mean(LOY_prop)) -> out.
@@ -272,15 +388,16 @@ paste0("Mean age was ", round(mean(tmp$age, na.rm = T),2), " range: ",
 
 
 
-###### SAMPLE SIZE | NEURO DIAG
+###### SAMPLE SIZE | NEURO DIAGNOSIS
 readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
    as.data.table() -> l
 
-filter_function(min_cells = 50,l = l) -> dat
+filter_function(min_cells = 100, score = -1.25, l = l, 
+                type = c("Astrocyte","Neuron","OPC","Microglia","Oligodendrocyte","Pericyte","CAM","Monocyte","Fibroblast")) -> dat
 paste0(dat$sample, "_", dat$cohort) -> dat$ID
 dat %>% dplyr::distinct(ID, .keep_all = T ) %>% dplyr::group_by(neuro_degen_diagnosis) %>% dplyr::summarise(count = dplyr::n())
-
+dat %>% dplyr::distinct(ID, .keep_all = T ) %>% dplyr::group_by(CLEAN) %>% dplyr::summarise(count = dplyr::n())
 
 # net LOY prop
 dat %>% group_by(cell_type) %>% summarise(LOY = sum(LOY_cells), NORMAL = sum(NORMAL_cells)) %>%
@@ -290,26 +407,56 @@ dat %>% group_by(cell_type) %>% summarise(LOY = sum(LOY_cells), NORMAL = sum(NOR
 paste0("Of all included cells/nuclei ", 100 * round((sum(out$LOY) / sum(out$total)), 4), "% were classified as LOY")
 
 if(save == T){
-data.table::fwrite(out, file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/TABLES/summarized_cell_type_LOY.csv")}
+data.table::fwrite(out, file = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/TABLES/summarized_cell_type_LOY.csv")}
 
 
-# LOY % by sample 
+# LOY % by cell_Type/cohort 
 paste0(dat$sample,"_",dat$cohort) -> dat$ID
 dat %>% group_by(cohort, cell_type) %>% summarise(LOY = sum(LOY_cells), NORMAL = sum(NORMAL_cells)) %>%
   dplyr::mutate(total = LOY + NORMAL, prop = LOY / total) -> out
 
+# LOY % by sample
+dat %>% group_by(cohort, sample, cell_type) %>% summarise(LOY = sum(LOY_cells), NORMAL = sum(NORMAL_cells)) %>%
+  dplyr::mutate(total = LOY + NORMAL, prop = LOY / total) -> out
+
+
+factor(out$cell_type, levels = c("Microglia","Astrocyte","Oligodendrocyte","Neuron","OPC")) -> out$cell_type
+ggline(out, x = "cell_type", color = "sample", y = "prop") %>% ggpar(legend = "none")
 
 ### NUMBER OF SAMPLES WITH GREATER THAN 10, 15, 20, 25% LOY ######
 readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
    as.data.table() -> l
-filter_function(min_cells = 75, score = -2, l = l) -> dat
+filter_function(min_cells = 100, score = -1.25, l = l, type = l$cell_type %>% unique) -> dat
 paste0(dat$sample, "_", dat$cohort) -> dat$ID
 
 dat[dat$LOY_prop > 0.10,]$cell_type %>% table()
 dat[dat$LOY_prop > 0.15,]$cell_type %>% table()
 dat[dat$LOY_prop > 0.20,]$cell_type %>% table()
 dat[dat$LOY_prop > 0.25,]$cell_type %>% table()
+```
+
+```{r figure_idea}
+
+readr::read_csv(
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+   as.data.table() -> l
+
+filter_function(min_cells = 100, score = -1.25, l = l, 
+                type = c("Astrocyte","Neuron","OPC","Microglia","Oligodendrocyte")) -> dat
+paste0(dat$sample, "_", dat$cohort) -> dat$ID
+dat %>% dplyr::distinct(ID, .keep_all = T ) %>% dplyr::group_by(neuro_degen_diagnosis) %>% dplyr::summarise(count = dplyr::n())
+
+
+
+# LOY % by sample
+dat %>% group_by(cohort, sample, cell_type) %>% summarise(LOY = sum(LOY_cells), NORMAL = sum(NORMAL_cells)) %>%
+  dplyr::mutate(total = LOY + NORMAL, prop = LOY / total) -> out
+
+
+factor(out$cell_type, levels = c("Microglia","Astrocyte","Oligodendrocyte","Neuron","OPC")) -> out$cell_type
+ggline(out, x = "cell_type", color = "sample", y = "prop") %>% ggpar(legend = "none")
+
 ```
 
 
@@ -333,10 +480,10 @@ dat[dat$LOY_prop > 0.25,]$cell_type %>% table()
 
 ### LOY FREQUENCY BY CELL_TYPE BARPLOT ######
 readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
    as.data.table() -> l
 
-filter_function(l = l, min_cells = 75) -> dat
+filter_function(l = l, min_cells = 100, score = -1.25) -> dat
 
 factor(dat$cell_type, levels = c("Microglia","Pericyte", "OPC","Oligodendrocyte","Astrocyte","Neuron"),
        labels = c("Microglia","Pericyte", "OPC","OL","Astrocyte","Neuron")) -> dat$cell_type
@@ -345,7 +492,7 @@ dat %>% dplyr::group_by(cell_type) %>% dplyr::summarise(LOY = sum(LOY_cells), NO
   ggbarplot(x = "cell_type", y = "LOY_prop", palette = dittoSeq::dittoColors()[c(5,8,7,1,6,9)], fill = "cell_type") %>%
     ggpar(x.text.angle = 45, font.xtickslab = c(10,"bold"), ylab = "LOY proportion", xlab = "") %>% ggpar(legend = "none") -> p
 
-plots <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/MAIN/Fig2"
+plots <- "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS/Fig2"
 ggsave(plot = p,
        filename = paste0(plots,"/LOY_proportion_by_cell_type_sum.pdf"),
        dpi = "retina", units = "in", height = 3, width = 2)
@@ -355,31 +502,14 @@ ggsave(plot = p,
 
 ```{r main_plots}
 ##### MAIN PLOTS ##############
-plots <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/MAIN/Fig2"
+plots <- "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS/Fig2"
 
 ### NEURO + CELLTYPE |  LOY
 readr::read_csv(
   "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
    as.data.table() -> l
 
-#
-#
-#
-#
-# Clean 
-#
-#
-#
-#
-
-#l[l$TOTAL_CELLS > 75 & l$sum_Y_exp >= 250, ] -> l
-#l[l$cell_type%in%c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC","Pericyte"),] -> dat
-#dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
-#dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
-#data.table::fwrite(dat, file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/TABLES/sample_cell_type_LOY_data.csv")
-
-
-filter_function(l = l, min_cells = 75) -> dat
+filter_function(l = l, min_cells = 100, score = -1.25) -> dat
 
 factor(dat$cell_type, levels = c("Microglia","Pericyte", "OPC","Oligodendrocyte","Astrocyte","Neuron"),
        labels = c("Microglia","Pericyte", "OPC","OL","Astrocyte","Neuron")) -> dat$cell_type
@@ -393,7 +523,7 @@ tmp + facet_grid(~ cell_type) -> tmp
 
 if(save == T){
 ggsave(plot = tmp,
-       filename = paste0(plots,"/NEURO_LOY_BRAIN_CELL_TYPES_3000_1000_no_jitter.pdf"), dpi = "retina", units = "cm", height = 9, width = 13)}
+       filename = paste0(plots,"/NEURO_LOY_BRAIN_CELL_TYPES_3000_1000_no_jitter.pdf"), dpi = "retina", units = "in", height = 5, width = 12)}
 
 
 
@@ -404,17 +534,15 @@ ggstripchart(dat[dat$cell_type %in% c("Microglia","Astrocyte","Neuron","OPC","OL
              y = "LOY_prop") %>% ggpar(x.text.angle = 45, ylim = c(0,0.6), legend = "none") -> tmp
 tmp + facet_grid(~ cell_type) -> tmp
 
-plots <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/MAIN/Fig2"
-
 
 ### CELL TYPE | LOY ##########
 readr::read_csv(
   "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
    as.data.table() -> l
 
-filter_function(l = l, min_cells = 100) -> dat
-factor(dat$cell_type, levels = c("Microglia","Pericyte", "Oligodendrocyte","OPC","Astrocyte","Neuron"),
-       labels = c("Microglia","Pericyte", "OL","OPC","Astrocyte","Neuron")) -> dat$cell_type
+filter_function(l = l, min_cells = 100, score = -1.25) -> dat
+factor(dat$cell_type, levels = c("Microglia","Pericyte", "OPC","Oligodendrocyte","Astrocyte","Neuron"),
+       labels = c("Microglia","Pericyte", "OPC","OL","Astrocyte","Neuron")) -> dat$cell_type
 
 dat %>% group_by(sample,cell_type,cohort) %>% summarize(mean_LOY = mean(LOY_prop) , prop = LOY_prop) -> tmp
 
@@ -433,8 +561,40 @@ ggsave(plot = tmp,
        filename = paste0(plots,"/LOY_BRAIN_CELL_TYPES_3000_1000_no_jitter_.pdf"),
        dpi = "retina", units = "in", height = 6, width = 3)}
 
+# jitter 
+ggboxplot(dat[dat$cell_type %in% c("Microglia","Astrocyte","Neuron","OPC","OL"),], add = "jitter",
+          x = "cell_type", font.xtickslab = c(6), size = 0.2, add.params = list(size = 0.4,shape = 21),
+          xlab = "", ylab = "LOY proportion", fill = "cell_type", palette = dittoSeq::dittoColors()[c(5,1,6,7,8)],
+          y = "LOY_prop") %>%
+          ggpar(x.text.angle = 45, legend = "none",
+                font.xtickslab = c(10,"bold"), font.y = c(10,"bold") ) + coord_cartesian(ylim = c(0,0.6)) -> tmp
+if(save == T){ 
+ggsave(plot = tmp,
+       filename = paste0(plots,"/LOY_BRAIN_CELL_TYPES_3000_1000_jitter_.pdf"),
+       dpi = "retina", units = "in", height = 4.5, width = 2.5)}
+
+
+```
+
+
+```{r reviewer_comment}
 
 ### IF THE OUTLIERS ARE REMOVED (>20% LOY) HOW DOES IT AFFECT THE AD-LOY ASSOCIATION? and CELL TYPE LOY rates.
+### CELL TYPE | LOY ##########
+readr::read_csv(
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+   as.data.table() -> l
+
+filter_function(l = l, min_cells = 100, score = -1.25) -> dat
+factor(dat$cell_type, levels = c("Microglia","Pericyte", "OPC","Oligodendrocyte","Astrocyte","Neuron"),
+       labels = c("Microglia","Pericyte", "OPC","OL","Astrocyte","Neuron")) -> dat$cell_type
+
+dat %>% group_by(sample,cell_type,cohort) %>% summarize(mean_LOY = mean(LOY_prop) , prop = LOY_prop) -> tmp
+
+fun_mean <- function(x){
+  return(data.frame(y=mean(x),label=mean(x,na.rm=T)))}
+
+
 ggboxplot(dat[dat$cell_type %in% c("Microglia","Astrocyte","Neuron","OPC","OL") &
                 !(dat$file %in% c("A163_17_samples_stat_GSE160936_3000_1000_Microglia.csv",
                                     "A096_14_samples_stat_GSE160936_3000_1000_Microglia.csv",
@@ -481,51 +641,22 @@ dat[dat$cell_type %in% c("Microglia","Astrocyte","Neuron","OPC","OL"),] %>%
   group_by(cell_type) %>%
   summarize(total = sum(TOTAL_CELLS), LOY = sum(LOY_cells)) %>% dplyr::mutate(LOY / total)
 
-
-
-
-### NEURO + CELLTYPE |  LOY #########
-readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
-   as.data.table() -> l
-
-l[l$TOTAL_CELLS > 75 & l$sum_Y_exp >= 250, ] -> l
-l[l$cell_type%in%c("Oligodendrocyte","Microglia","Astrocyte","Neuron","OPC"),] -> dat
-dat[dat$neuro_degen_diagnosis=="Normal",]$neuro_degen_diagnosis <- "Control"
-dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
-dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
-
-factor(x = dat$cell_type, levels = c("Microglia","Astrocyte","Neuron","Oligodendrocyte","OPC"),
-       labels = c("Microglia","Astrocyte","Neuron","OL","OPC")) -> dat$cell_type
-dat[which(dat$sample=="Microglia_MO_MCI3"),]$neuro_degen_diagnosis <- "AD"
-
-dat[dat$cell_type=="Microglia" & dat$neuro_degen_diagnosis %in% c("Control","AD"),]
-
-
-ggboxplot(dat[dat$cell_type %in% c("Microglia","Astrocyte","Neuron","OPC","OL"),],
-          x = "neuro_degen_diagnosis", font.xtickslab = c(6), size = 0.2, outlier.size = 0.2, add = "jitter",
-          xlab = "", ylab = "Loss of Y proportion", fill = "neuro_degen_diagnosis", palette = "aaas",
-          y = "LOY_prop") %>% ggpar(x.text.angle = 45, ylim = c(0,0.6), legend = "none") -> tmp
-tmp + facet_grid(~ cell_type) -> tmp
-
-if(save == T){ 
-ggsave(plot = tmp,
-       filename = paste0(plots,"/NEURO_LOY_BRAIN_CELL_TYPES_3000_1000_no_jitter.tiff"), dpi = "retina",
-       units = "cm", height = 9, width = 13)}
 ```
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 
-```{r age_LOY_plots}
+```{r SuppX_age_scatter}
 
 ##### AGE + CELL TYPE | LOY #######
 
+plots <- "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS/Supp_age/"
+
 readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
    as.data.table() -> l
 
-filter_function(l = l, min_cells = 100, score = -1) -> dat
+filter_function(l = l, min_cells = 100, score = -1.25) -> dat
 dat[!is.na(dat$donor_organism.age),] -> tmp
 
 
@@ -555,64 +686,255 @@ tmp[tmp$cell_type=="Microglia",] %>% dplyr::group_by(cohort,sample) %>%
             y = "LOY_prop") %>% ggpar(x.text.angle = 45, ylim = c(0,0.6), legend = "none", font.xtickslab = c(8)) +
             stat_compare_means(comparisons = my_comparisons ) -> e
 
-ggboxplot(tmp, x = "quantile_age", fill = "quantile_age", size = 0.2,
+ggboxplot(tmp, x = "quantile_age", fill = "quantile_age", size = 0.2, add.params = list(size = 0.5),
           xlab = "", ylab = "Loss of Y proportion", outlier.size = 0.5, add = "jitter",
           y = "LOY_prop") %>% ggpar(x.text.angle = 45, ylim = c(0,0.6), legend = "none", font.xtickslab = c(8)) -> e
 e + facet_grid(~ cell_type) + scale_fill_brewer(palette = "Greens") -> e
 
 if(save == T){ 
-ggsave(plot = e, filename = paste0(plots,"/AGE_BRAIN_CELL_TYPES_no_jitter_3000_1000.tiff"), dpi = "retina", units = "in",
-       height = 4.76, width = 6)}
+ggsave(plot = e, filename = paste0(plots,"/AGE_BRAIN_CELL_TYPES_no_jitter_3000_1000.pdf"), dpi = "retina", units = "in",
+       height = 5, width = 7)}
 
-tmp[!is.na(tmp$donor_organism.age),] -> tmp
-tmp[tmp$cell_type %in% c("Microglia","Astrocyte","Neuron","OL","OPC") &
-      !(tmp$quantile_age %in% c("Prenatal")),] -> tmp
-ggboxplot(tmp, x = "quantile_age", fill = "quantile_age", size = 0.2,
-          xlab = "", ylab = "Loss of Y proportion", outlier.size = 0.5,
-          y = "LOY_prop") %>% ggpar(x.text.angle = 45, ylim = c(0,0.6), legend = "none", font.xtickslab = c(8)) -> e
-e + scale_fill_brewer(palette = "Greens") -> e
-e + ggplot2::coord_cartesian(ylim = c(0,0.2)) -> e
-
-
-if(save == T){ 
-ggsave(plot = e, filename = paste0(plots,"/AGE_BRAIN_no_jitter_3000_1000.tiff"), dpi = "retina", units = "in",
-       height = 4, width = 3) }
-
-ggscatter(tmp,x = "donor_organism.age", y = "LOY_prop", add = "reg.line", size = 1, color = "cell_type", palette = "npg",
-          add.params = list(color = "blue")) + stat_cor()
+#ggscatter(tmp,x = "donor_organism.age", y = "LOY_prop", add = "reg.line", size = 1, color = "cell_type", palette = "npg",
+#          add.params = list(color = "blue")) + stat_cor()
 
 
 #### AGE SCATTER #############
 readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
    as.data.table() -> l
 
-filter_function(l=l, min_cells = 100, score = -1.25, type = c("Microglia","Astrocyte","Neuron","Oligodendrocyte","OPC","Pericyte")) -> dat
+filter_function(l=l, min_cells = 100, score = -1.75, type = c("Microglia","Astrocyte","Neuron","Oligodendrocyte","OPC","Pericyte")) -> dat
 
 cut(x = dat$donor_organism.age, breaks = c(-20,0,30,60,80,100),
     labels = c("Prenatal","0-29","30-59","60-79","80-100")) -> dat$quantile_age
 dat[!is.na(dat$donor_organism.age),] -> tmp
 
-factor(x = tmp$cell_type, levels = c("Microglia","Astrocyte","Neuron","Oligodendrocyte","OPC","Pericyte"),
-       labels = c("Microglia","Astrocyte","Neuron","OL","OPC","Pericyte")) -> tmp$cell_type
+tmp[tmp$cell_type %in% c("Microglia","Astrocyte","Neuron","Oligodendrocyte","OPC"),] -> tmp
 
-tmp[!is.na(tmp$donor_organism.age),] -> tmp
-tmp[tmp$cell_type %in% c("Microglia","Astrocyte","Neuron","OL","OPC"),] -> tmp
+factor(x = tmp$cell_type, levels = c("Microglia","OPC","Oligodendrocyte","Astrocyte","Neuron"),
+       labels = c("Microglia","OPC","OL","Astrocyte","Neuron")) -> tmp$cell_type
+
+factor(tmp$CLEAN, levels = c("AD","HD","MS","Non-degenerative","Other dementias","PD","ALS")) -> tmp$CLEAN
 
 tmp %>%
-  ggscatter(x = "donor_organism.age",y = "LOY_prop", color = "CLEAN",
-            size = 1, add.params = list(color="black"),
-            palette = get_palette(palette = "npg",6)) +
-            geom_smooth(method = "lm", se = F) + stat_cor() + facet_grid(~cell_type) -> p
-            ggpar(p, font.xtickslab = c(9,"bold"), x.text.angle = 45)
+    ggscatter(x = "donor_organism.age",y = "LOY_prop", color = "CLEAN",
+            size = 0.7, add.params = list(color="black"),
+            palette = get_palette(palette = "npg",7)) +
+            geom_smooth(method = "lm", se = F, size = 0.5, color = "black") + stat_cor() + facet_grid(~cell_type) -> p
+            ggpar(p, font.xtickslab = c(9,"bold"), x.text.angle = 45,  xlim = c(0,100), 
+                  legend = "bottom",ylab = "LOY (%)", xlab = "Donor age (years)",
+                  legend.title = "Diagnosis") -> a 
+            a + scale_y_continuous(labels = scales::percent_format(accuracy = 1)) -> a
+
+tmp[tmp$CLEAN %in% c("Non-degenerative"),] %>%
+  ggscatter(x = "donor_organism.age",y = "LOY_prop", color = "CLEAN", size = 0.7, 
+            palette = get_palette("npg",6)[4]) + geom_smooth(method = "lm", se = F, 
+                                           size = 0.5, color = "black") + stat_cor() -> p
+           p + facet_grid(~cell_type) -> p
+            ggpar(p, font.xtickslab = c(9,"bold"), x.text.angle = 45, 
+                  xlab = "Donor age (years)", ylab = "LOY (%)") -> b 
+            b + scale_y_continuous(labels = scales::percent_format(accuracy = 1)) ->b 
+            
+
+ if(save == T){ 
+ggsave(plot = a, filename = paste0(plots,"/Age_scatter_all_neuro_3000_1000.pdf"), dpi = "retina", units = "in",
+       height = 4, width = 9.5)}           
+            
+ if(save == T){ 
+ggsave(plot = b, filename = paste0(plots,"/Age_scatter_control_3000_1000.pdf"), dpi = "retina", units = "in",
+       height = 4, width = 9.5)}           
+                      
+            
+### neg age-LOY dependence in neurons
+tmp[tmp$CLEAN %in% c("Non-degenerative") & tmp$cell_type=="Microglia",] -> df
+
+df[df$sequencing_method %in% c("10x 3' v3","10X 3' v3"),]$sequencing_method <- "10X 3' v3"
+df[df$sequencing_method %in% c("10x 3' v2","10X 3' v2"),]$sequencing_method <- "10X 3' v2"
+
+lm(data = df, formula = LOY_prop ~ sequencing_method + sum_Y_exp_scaled + donor_organism.age) %>% summary()
+            
+
+### 
+
+readr::read_csv(
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
+   as.data.table() -> l
+
+filter_function(l=l, min_cells = 100, score = -2, type = c("Microglia","Astrocyte","Neuron","Oligodendrocyte","OPC","Pericyte")) -> dat
+
+cut(x = dat$donor_organism.age, breaks = c(-20,0,30,60,80,100),
+    labels = c("Prenatal","0-29","30-59","60-79","80-100")) -> dat$quantile_age
+dat[!is.na(dat$donor_organism.age),] -> tmp
+
+#### MICROGLIA 
+tmp[tmp$cell_type%in%c("Microglia"),] -> df
+ifelse(df$CLEAN == "AD", 1,0) %>% as.factor() -> df$AD
+df$OTHER <- "o"
+df[df$CLEAN == "AD",]$OTHER <- "AD"
+df[df$CLEAN == "Non-degenerative",]$OTHER <- "Control"
+df[!(df$CLEAN %in% c("AD","Non-degenerative")),]$OTHER <- "OtherNeuro"
+factor(x = df$OTHER, levels = c("Control","AD","OtherNeuro")) -> df$OTHER
+
+df[df$sequencing_method %in% c("10x 3' v3","10X 3' v3"),]$sequencing_method <- "10X 3' v3"
+df[df$sequencing_method %in% c("10x 3' v2","10X 3' v2"),]$sequencing_method <- "10X 3' v2"
+df[df$sequencing_method %in% c("single_cell"),]$sequencing_method <- "10X 3' v2"
+
+lm(data = df, formula = LOY_prop ~ sequencing_method + sum_Y_exp_scaled + OTHER + donor_organism.age) %>% summary()
+
+ggscatter(data = df, x = "sum_Y_exp_scaled", y = "LOY_prop")
+ggboxplot(data = df, x = "sequencing_method", y = "LOY_prop")
+
+      
+### 
+tmp[tmp$cell_type=="Neuron" & tmp$CLEAN == "Non-degenerative",] -> df
+ifelse(df$CLEAN == "AD", 1,0) %>% as.factor() -> df$AD
+df[df$sequencing_method %in% c("10x 3' v3","10X 3' v3"),]$sequencing_method <- "10X 3' v3"
+df[df$sequencing_method %in% c("10x 3' v2","10X 3' v2"),]$sequencing_method <- "10X 3' v2"
+
+fit2<-aov(data = df, formula = LOY_prop ~ sequencing_method + sum_Y_exp_scaled + donor_organism.age)
+car::Anova(fit2, type="III")
+
+### 
+tmp[tmp$cell_type=="OL",] -> df
+ifelse(df$CLEAN == "AD", 1,0) %>% as.factor() -> df$AD
+df[df$sequencing_method %in% c("10x 3' v3","10X 3' v3"),]$sequencing_method <- "10X 3' v3"
+df[df$sequencing_method %in% c("10x 3' v2","10X 3' v2"),]$sequencing_method <- "10X 3' v2"
+
+fit2<-aov(data = df, formula = LOY_prop ~ sequencing_method + sum_Y_exp_scaled + CLEAN + donor_organism.age)
+car::Anova(fit2, type="III")
+          
+### 
+tmp[tmp$cell_type=="OPC",] -> df
+ifelse(df$CLEAN == "AD", 1,0) %>% as.factor() -> df$AD
+df[df$sequencing_method %in% c("10x 3' v3","10X 3' v3"),]$sequencing_method <- "10X 3' v3"
+df[df$sequencing_method %in% c("10x 3' v2","10X 3' v2"),]$sequencing_method <- "10X 3' v2"
+
+fit2<-aov(data = df, formula = LOY_prop ~ sequencing_method + sum_Y_exp_scaled + donor_organism.age)
+car::Anova(fit2, type="III")
+
+```
+
+```{r SuppX_age_hist}
+readr::read_csv(
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
+   as.data.table() -> l
+
+filter_function(l = l, score = -1.25, min_cells = 100) -> dat
+factor(x = dat$cell_type, levels = c("Microglia","OPC","Oligodendrocyte","Astrocyte","Neuron"),
+       labels = c("Microglia","OPC","OL","Astrocyte","Neuron")) -> dat$cell_type
+paste0(dat$cohort, "_", dat$sample) -> dat$id
+
+dat[!is.na(dat$donor_organism.age),] -> dat
+
+
+
+
+lapply(c("Microglia","OPC","OL","Astrocyte","Neuron"), function(x){
+  
+  if(x == "Microglia"){co <- 5}
+  if(x == "OPC"){co <- 8}
+  if(x == "OL"){co <- 7}
+  if(x == "Astrocyte"){co <- 1}
+  if(x == "Neuron"){co <- 6}
+  
+  dat[dat$cell_type==x,]$donor_organism.age %>% mean() %>% print()
+   dat[dat$cell_type==x,]$donor_organism.age %>% length() %>% print()
+  
+  
+  gghistogram(data = dat[dat$cell_type==x,], x = "donor_organism.age", fill= dittoSeq::dittoColors()[co] , 
+              color= NA , title = x, alpha = 1,
+            palette = dittoSeq::dittoColors()[co] ) %>% 
+            ggpar(legend = "none", xlim = c(0,100), ylim = c(0,25), xlab = "Donor age (years)", ylab = "Frequency", 
+                  font.ytickslab = c(8), font.x = c(9),
+                  font.xtickslab = c(8), x.text.angle = 45) -> p 
+            
+  
+return(p)
+  
+}) -> pl
+
+ggarrange(plotlist = pl, ncol = 5, nrow = 1) -> p 
+
+
+if(save == T){ 
+ggsave(plot = p,
+       filename = paste0(plots,"/LOY_BRAIN_CELL_TYPES_3000_1000_SAMPLE_SIZE_HIST.pdf"),
+       dpi = "retina", units = "in", height = 2.5, width = 9)}
+
+
+
+```
+
+
+```{r brain_regions}
+
+readr::read_csv(
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+   as.data.table() -> l
+
+filter_function(l = l, score = -1.25, min_cells = 100) -> dat
+factor(x = dat$cell_type, levels = c("Microglia","OPC","Oligodendrocyte","Astrocyte","Neuron"),
+       labels = c("Microglia","OPC","OL","Astrocyte","Neuron")) -> dat$cell_type
+paste0(dat$cohort, "_", dat$sample) -> dat$id
+
+c("Substantia nigra",
+  "Temporal cortex",
+  "Occipital cortex",
+  "Occipitotemporal cortex", "Putamen", "Caudate nucleus", "Midbrain", 
+  "Hippocampus", "Prefrontal cortex" ,"Amygdala", "Motor cortex", "Dentate gyrus", "Cingulate gyrus")
+
+
+```
+
+
+```{r linear_models}
+
+readr::read_csv(
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+   as.data.table() -> dd
+
+filter_function(l=dd, min_cells = 100, score = -1.25, type = c("Microglia","Astrocyte","Neuron","Oligodendrocyte","OPC")) -> tmp
+### 
+lapply(X = tmp$cell_type %>% unique, function(x){
+  
+  tmp[tmp$cell_type==x,] -> df
+  df$LOY_percent <- df$LOY_prop * 100
+  df[df$sequencing_method %in% c("10x 3' v3","10X 3' v3"),]$sequencing_method <- "10X 3' v3"
+  df[df$sequencing_method %in% c("10x 3' v2","10X 3' v2"),]$sequencing_method <- "10X 3' v2"
+
+  lm(data = df, formula = LOY_prop ~ TOTAL_CELLS + sum_Y_exp_scaled) %>% summary() -> s
+  
+  s$coefficients %>% as.data.frame() -> d
+  d$variable <- rownames(d)
+  d$cell_type <- x
+  d$formula <- "LOY_percent ~ sequencing_method + TOTAL_CELLS + sum_Y_exp_scaled"
+  return(d)
+  
+}) -> l
+data.table::rbindlist(l) -> l
+
+l[l$variable!="(Intercept)",] -> l
+
+reshape2::dcast(data = l, formula = cell_type ~ variable, value.var = "Pr(>|t|)")
+
+
+
+
+
+
+
+
+```
+          
+
+
+
+
+
+```{r X}
 
             
-tmp[tmp$CLEAN %in% c("Non-degenerative"),] %>%
-  ggscatter(x = "donor_organism.age",y = "LOY_prop", color = "CLEAN", size = 1, add.params = list(color="black"),
-            palette = "npg") + geom_smooth(method = "lm", se = F) + stat_cor() + facet_grid(CLEAN~cell_type) -> p
-            ggpar(p, font.xtickslab = c(9,"bold"), x.text.angle = 45)
-
-
 ### CELLTYPE |  LOY | NEURO BROAD #########
 readr::read_csv(
   "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
@@ -901,27 +1223,52 @@ lm(data = dat[dat$cell_type %in% c("Microglia","Astrocyte"),], formula = LOY_pro
 
 
 ```{r fig2c}
-plots <- "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/MAIN/Fig2"
+plots <- "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS/Fig2/"
 
 readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000_.txt") %>%
    as.data.table() -> l
 
-filter_function(l = l, min_cells = 75, sum_Y = 250) -> dat
+filter_function(l = l, min_cells = 100, score = -1.25) -> dat
 factor(x = dat$cell_type, levels = c("Microglia","OPC","Oligodendrocyte","Astrocyte","Neuron"),
        labels = c("Microglia","OPC","OL","Astrocyte","Neuron")) -> dat$cell_type
 paste0(dat$cohort, "_", dat$sample) -> dat$id
-
+GSE174332
 
 lapply(c("Microglia","OPC","OL","Astrocyte","Neuron"), function(x){
   
-  dat[dat$CLEAN %in% c("Non-degenerative","AD") & dat$cell_type == x,] %>% 
+  
+  
+  dat[dat$CLEAN %in% c("Non-degenerative","AD") & dat$cell_type == x & !is.na(dat$donor_organism.age),] -> kk
+  
+  ifelse(test = kk$CLEAN == "AD", yes = 1, no = 0) %>% as.character() %>% as.factor() -> kk$AD
+  
+  ancova_model <- aov(LOY_prop ~  sum_Y_exp_scaled + TOTAL_CELLS + donor_organism.age  + AD, data = kk)
+  anova(ancova_model)
+  
+  kk %>% 
   ggboxplot(x = "CLEAN", y = "LOY_prop", size = 0.3,
           add = "jitter", title = x, add.params = list(size = 0.8),
           fill = "CLEAN") -> p
   p + coord_cartesian(ylim = c(0,0.6)) -> p
   p %>% ggpar(palette = get_palette("npg",4)[c(1,4)], xlab = "", 
               ylab = "", legend = "none", x.text.angle = 45 ) -> p
+  
+  lm(data =  kk, 
+     formula = LOY_prop ~ sum_Y_exp_scaled + TOTAL_CELLS + donor_organism.age + CLEAN) -> m
+  summary(m) -> s 
+  
+  print(x)
+  print(s$coefficients)
+  
+  
+  lm(data =  kk, 
+     formula = LOY_prop ~ CLEAN) -> m
+  summary(m) -> s 
+  
+   print(x)
+  print(s$coefficients)
+  
   
 return(p)
   
@@ -934,21 +1281,12 @@ ggsave(plot = p,
        dpi = "retina", units = "in", height = 3, width = 9)}
 
 
-### Sample sizes
-dat[dat$neuro_degen_diagnosis %in% c("Control","AD/MCI"),] %>% 
-  dplyr::group_by(neuro_degen_diagnosis, cell_type) %>%
-  dplyr::summarise(count = dplyr::n()) %>% 
-  reshape2::dcast(cell_type ~ neuro_degen_diagnosis, value.var = "count")
 
 
 
-### AD-LOY association
-
-dat[dat$neuro_degen_diagnosis %in% c("Control","AD/MCI"),] %>% 
-  dplyr::group_by(neuro_degen_diagnosis, cell_type) %>%
-  dplyr::summarise(count = dplyr::n()) %>% 
-  reshape2::dcast(cell_type ~ neuro_degen_diagnosis, value.var = "count")
-
+ancova_model <- aov(LOY_prop ~ AD + donor_organism.age , data = kk)
+postHocs <- glht(ancova_model)
+summary(postHocs)
 
 ```
 
@@ -961,164 +1299,6 @@ dat[dat$neuro_degen_diagnosis %in% c("Control","AD/MCI"),] %>%
 ```{r table_S2}
 
 
-```
-
-```{r fig2_supp_age_dist}
-readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
-   as.data.table() -> l
-
-filter_function(l = l, min_cells = 75, sum_Y_ex = 250) -> dat
-factor(x = dat$cell_type, levels = c("Microglia","OPC","Oligodendrocyte","Astrocyte","Neuron"),
-       labels = c("Microglia","OPC","OL","Astrocyte","Neuron")) -> dat$cell_type
-paste0(dat$cohort, "_", dat$sample) -> dat$id
-
-dat[!is.na(dat$donor_organism.age),] -> dat
-
-
-
-
-lapply(c("Microglia","OPC","OL","Astrocyte","Neuron"), function(x){
-  
-  if(x == "Microglia"){co <- 5}
-  if(x == "OPC"){co <- 8}
-  if(x == "OL"){co <- 7}
-  if(x == "Astrocyte"){co <- 1}
-  if(x == "Neuron"){co <- 6}
-  
-  dat[dat$cell_type==x,]$donor_organism.age %>% mean() %>% print()
-   dat[dat$cell_type==x,]$donor_organism.age %>% length() %>% print()
-  
-  
-  gghistogram(data = dat[dat$cell_type==x,], x = "donor_organism.age", fill= dittoSeq::dittoColors()[co] , 
-              color= NA , title = x, alpha = 1,
-            palette = dittoSeq::dittoColors()[co] ) %>% 
-            ggpar(legend = "none", ylim = c(0,20), xlab = "", ylab = "", font.ytickslab = c(8),
-                  font.xtickslab = c(8), x.text.angle = 45) -> p 
-            
-  
-return(p)
-  
-}) -> pl
-
-ggarrange(plotlist = pl, ncol = 5, nrow = 1) -> p 
-
-
-if(save == T){ 
-ggsave(plot = p,
-       filename = paste0(plots,"/LOY_BRAIN_CELL_TYPES_3000_1000_SAMPLE_SIZE.pdf"),
-       dpi = "retina", units = "in", height = 2.5, width = 8.5)}
-
-
-
-```
-
-
-
-```{r fig2_age_scatter}
-
-#### AGE SCATTER #############
-readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
-   as.data.table() -> l
-
-filter_function(l, min_cells = 75, sum_Y_exp = 250 ) -> dat
-
-cut(x = dat$donor_organism.age, breaks = c(-20,0,30,60,80,100),
-    labels = c("Prenatal","0-29","30-59","60-79","80-100")) -> dat$quantile_age
-dat[!is.na(dat$donor_organism.age),] -> tmp
-
-
-factor(x = tmp$cell_type, levels = c("Microglia","Astrocyte","Neuron","Oligodendrocyte","OPC"),
-       labels = c("Microglia","Astrocyte","Neuron","OL","OPC")) -> tmp$cell_type
-
-tmp[!is.na(tmp$donor_organism.age),] -> tmp
-tmp[tmp$cell_type %in% c("Microglia","Astrocyte","Neuron","OL","OPC") &
-      !(tmp$quantile_age %in% c("Prenatal")),] -> tmp
-
-ifelse(tmp$neuro_degen_diagnosis %in% c("AD/MCI","HD","PD","ALS","LBD/FTLD"),
-       "Neurodegenerative disorder", "Control") -> tmp$neuro_degen_diagnosis_broad
-
-ifelse(tmp$neuro_degen_diagnosis == "AD/MCI", "AD/MCI", ifelse(tmp$neuro_degen_diagnosis == "Control",
-"Control", "Other")) -> tmp$condensed
-
-factor(tmp$cell_type, levels = c("Microglia","OPC","OL","Astrocyte","Neuron")) -> tmp$cell_type
-tmp %>%
-  ggscatter(x = "donor_organism.age",y = "LOY_prop", color = "condensed", add = "reg.line", 
-            size = 0.9, add.params = list(color="black",size = 0.9),
-            palette = get_palette(palette = "npg", 4)[c(1,3,4)]) + stat_cor() + facet_grid(~cell_type) -> p
-            ggpar(p, font.xtickslab = c(10), x.text.angle = 45, xlab = "", ylab = "", legend = "bottom", 
-                  legend.title = "Donor diagnosis") -> p
-
-if(save == T){             
-ggsave(plot = p,
-       filename = paste0(plots,"/LOY_BRAIN_CELL_TYPES_3000_1000_AGE_SCATTER.pdf"),
-       dpi = "retina", units = "in", height = 3.5, width = 8.5)}
-            
-            
-```
-
-
-
-```{r total_LOY_boxplots}
-
-readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
-   as.data.table() -> l
-
-#data.table::fread(paste0(output,"/LOY_prop_table.txt")) -> l
-l[l$TOTAL_CELLS > 50 & l$sum_Y_exp > 200, ] -> dat
-dat[!grepl(dat$file, pattern = "MD5893"),] -> dat
-dat[!grepl(dat$cohort, pattern = "GSE131907_LUNG_NSCLC_cleaned_filtered"),] -> dat
-dat[which(dat$sample=="Microglia_MO_MCI3"),]$neuro_degen_diagnosis <- "AD/MCI"
-dat[which(dat$neuro_degen_diagnosis=="AD"),]$neuro_degen_diagnosis <- "AD/MCI"
-
-cut(x = dat$donor_organism.age, breaks = c(-20,0,30,60,80,100),
-    labels = c("Prenatal","0-29","30-59","60-79","80-100")) -> dat$quantile_age
-dat[!is.na(dat$donor_organism.age),] -> tmp
-
-
-factor(x = tmp$cell_type, levels = c("Microglia","Astrocyte","Neuron","Oligodendrocyte","OPC"),
-       labels = c("Microglia","Astrocyte","Neuron","OL","OPC")) -> tmp$cell_type
-factor(tmp$cell_type, levels = c("Microglia","OPC","OL","Astrocyte","Neuron")) -> tmp$cell_type
-tmp[!is.na(tmp$donor_organism.age),] -> tmp
-tmp[tmp$cell_type %in% c("Microglia","Astrocyte","Neuron","OL","OPC") &
-      !(tmp$quantile_age %in% c("Prenatal")),] -> tmp
-
-ifelse(tmp$neuro_degen_diagnosis %in% c("AD/MCI","HD","PD","ALS","LBD/FTLD"),
-       "Neurodegenerative disorder", "Control") -> tmp$neuro_degen_diagnosis_broad
-paste0(tmp$cohort, "_", tmp$sample) -> tmp$id
-
-ifelse(tmp$neuro_degen_diagnosis == "AD/MCI", "AD/MCI", ifelse(tmp$neuro_degen_diagnosis == "Control",
-"Control", "Other")) -> tmp$condensed
-
-
-tmp %>% dplyr::group_by(id) %>% 
-  dplyr::summarise(LOY = sum(LOY_cells), NORMAL = sum(NORMAL_cells), quantile_age, donor_organism.age) %>% 
-  dplyr::mutate(LOY_prop. = LOY / (LOY + NORMAL)) %>%
-  ggboxplot(y = "LOY_prop.", x = "quantile_age")
-
-
-tmp %>% dplyr::group_by(id) %>% 
-  dplyr::summarise(LOY = sum(LOY_cells), NORMAL = sum(NORMAL_cells), quantile_age, donor_organism.age, neuro_degen_diagnosis) %>% 
-  dplyr::mutate(LOY_prop. = LOY / (LOY + NORMAL)) %>%
-  ggscatter(y = "LOY_prop.", x = "donor_organism.age", add.params = list(color = "black"), palette = "npg",
-            add = "reg.line", color = "neuro_degen_diagnosis") + stat_cor()
-
-
-tmp %>%
-  ggscatter(x = "donor_organism.age",y = "LOY_prop", color = "condensed", add = "reg.line", 
-            size = 0.6, add.params = list(color="black",size = 0.7),
-            palette = get_palette(palette = "npg", 4)[c(1,3,4)]) + stat_cor() + facet_grid(~cell_type) -> p
-            ggpar(p, font.xtickslab = c(10), x.text.angle = 45, xlab = "", ylab = "", legend = "bottom", 
-                  legend.title = "Donor diagnosis") -> p
-
-if(save == T){             
-ggsave(plot = p,
-       filename = paste0(plots,"/LOY_BRAIN_CELL_TYPES_3000_1000_AGE_SCATTER.pdf"),
-       dpi = "retina", units = "in", height = 3.5, width = 8.5)}
-            
-            
 ```
 
 
@@ -1140,34 +1320,39 @@ ggsave(plot = p,
 ```{r PAR_LOY_v_NORMAL}
 
 readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_3000_1000.txt") %>%
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/all_cell_types/LOY_prop_table_3000_1000_.txt") %>%
    as.data.table() -> l
 
-filter_function(l = l, min_cells = 75, sum_Y = 250, cell_type = l$cell_type %>% unique()) -> dat
+
+filter_function(l = l, min_cells = 0, score = -2, type  = l$cell_type %>% unique()) -> dat
 
 dat[dat$cell_type == "Monoycte",]$cell_type <- "Monocyte"
 
 paste0(dat$sample, "_", dat$cohort) -> dat$ID
 
-
 dat %>% dplyr::mutate(diff_PAR = log1p((expr_PAR_LOY - expr_PAR) / expr_PAR)) -> dat
 
-dat %>% dplyr::filter(LOY_cells >= 20) -> dat
+dat %>% dplyr::filter(LOY_cells >= 10) -> dat
 dat[dat$expr_PAR_LOY > 0, ] -> dat
-dat[dat$expr_PAR > 1.5, ] -> dat
+dat[dat$expr_PAR > 1, ] -> dat
+  
 
-ggscatter(dat, x = "diff_PAR", y = "LOY_prop", color = "cell_type") %>%
-  ggpar(x.text.angle = 45, font.xtickslab = c(10,"bold"), ylab = "LOY proportion", xlab = "") %>% ggpar(legend = "none") -> p
+factor(dat$cell_type, levels = c("Microglia","Astrocyte","Neuron","Oligodendrocyte","OPC","CAM","Pericyte",
+                                 "T cell", "NK", "Monocyte", "Macrophage","ILC","Kupffer","cDC", "pDC",
+                                 "B cell","Fibroblast","Endothelial","Epithelial")) -> dat$cell_type
 
-ggstripchart(dat, x = "cell_type", y = "diff_PAR", add = "mean_sd", add.params = list(color = "red"), 
-             size = "LOY_cells", shape = 21, fill = "blue", color = "black", stroke = 0.8) %>% 
-  ggpar(ylab = "logFC PAR (NORMAL v LOY)", xlab = "Cell type", font.xtickslab = c("bold",8),
+dat[!is.na(dat$cell_type),] -> dat
+ggstripchart(dat, x = "cell_type", y = "diff_PAR", add = "mean_sd", fill = "cell_type",
+             add.params = list(color = "red"), palette = dittoColors()[c(5,1,6,7,8,2,3,4,9,10:19)],
+            shape = 21, stroke = 0.8, size = 0.7) %>% 
+  ggpar(ylab = "logFC PAR (NORMAL v LOY)", xlab = "Cell type", font.xtickslab = c("bold",8), legend = "none", 
+        orientation = "horizontal",
         x.text.angle = 45) + geom_hline(yintercept = 0) -> p 
 
 
 if(save == T){ 
 ggsave(plot = p, filename = "a:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS_FOR_REVIEWERS/plots/PAR_logFC_stripchart.pdf",
-       dpi = "retina", width = 10, height = 6, units = "in"
+       dpi = "retina", width = 6, height = 9, units = "in"
         
       )
 }
@@ -1181,10 +1366,10 @@ dat$cell_type %>% unique %>% length
 
 ###################################### 1500 ######
 readr::read_csv(
-  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/LOY_prop_table_1500_1000.txt") %>%
+  "https://raw.githubusercontent.com/michaelcvermeulen/microglia-loss-of-y/main/data/LOY_tables/all_cell_types/LOY_prop_table_1500_1000.txt") %>%
    as.data.table() -> l
 
-filter_function(l = l, min_cells = 75, sum_Y = 250, cell_type = l$cell_type %>% unique()) -> dat
+filter_function(l = l, min_cells = 0, score = -2, cell_type = l$cell_type %>% unique()) -> dat
 
 dat[dat$cell_type == "Monoycte",]$cell_type <- "Monocyte"
 
@@ -1195,10 +1380,10 @@ dat %>% dplyr::mutate(diff_PAR = log1p((expr_PAR_LOY - expr_PAR) / expr_PAR)) ->
 
 dat %>% dplyr::filter(LOY_cells >= 20) -> dat
 dat[dat$expr_PAR_LOY > 0, ] -> dat
-dat[dat$expr_PAR > 1.5, ] -> dat
+dat[dat$expr_PAR > 1, ] -> dat
 
-ggscatter(dat, x = "diff_PAR", y = "LOY_prop", color = "cell_type") %>%
-  ggpar(x.text.angle = 45, font.xtickslab = c(10,"bold"), ylab = "LOY proportion", xlab = "") %>% ggpar(legend = "none") -> p
+ggscatter(dat, y = "diff_PAR", x = "LOY_prop", color = "cell_type") %>%
+  ggpar(x.text.angle = 45, font.xtickslab = c(10,"bold"), xlab = "LOY proportion", ylab = "") %>% ggpar(legend = "none") -> p
 
 ggstripchart(dat, x = "cell_type", y = "diff_PAR", add = "mean_sd", add.params = list(color = "red"), 
              size = "LOY_cells", shape = 21, fill = "blue", color = "black", stroke = 0.8) %>% 
