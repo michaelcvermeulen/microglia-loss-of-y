@@ -1,4 +1,8 @@
-### Preprocessing multimodal data for 
+### Preprocessing multimodal data from 10X multi modal sample data 
+### Figure1-microglia-loss-of-y
+### Genome Research
+### Michael Vermeulen
+### Mosaic loss of chromosome Y in human microglia
 
 library(Seurat)
 library(magrittr)
@@ -25,7 +29,7 @@ source('H:/LOY/scLOY/scLOY/data_raw/build_data_files.R')
 source("E:/LOY/scLOY/scripts/annotation_functions.R")
 
 
-### add link 
+### https://www.10xgenomics.com/resources/datasets/fresh-frozen-lymph-node-with-b-cell-lymphoma-14-k-sorted-nuclei-1-standard-2-0-0
 Read10X_h5("e:/LOY/scLOY/data/10X_MULTIOME_LYMPH/lymph_node_lymphoma_14k_filtered_feature_bc_matrix.h5") -> h5
 
 # fragment file

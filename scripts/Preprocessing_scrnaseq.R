@@ -1,6 +1,15 @@
+### Genome Research
+### Michael Vermeulen
+### Mosaic loss of chromosome Y in aged human microglia
+### sn/scRNA-seq processing 
+
+
 ### This is the template used to process all single-nuclei and single-cell data. 
 ### Here, preprocessing of GSE174332 primary motor cortex data is provided. 
 ### All other preprocessing scripts are available upon request. 
+
+### once each cell-type is processed individually and inspected, the cell-type files are merged. 
+
 
 ## load packages 
 

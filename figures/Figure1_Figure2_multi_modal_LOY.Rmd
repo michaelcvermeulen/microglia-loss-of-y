@@ -7,6 +7,11 @@ output: html_document
 
 ```{r setup_packages, include=FALSE}
 
+### Genome Research
+### Michael Vermeulen
+### Mosaic loss of chromosome Y in aged human microglia
+### Figure 1 and 2
+
 knitr::opts_chunk$set(echo = TRUE)
 
 library(Seurat)
@@ -44,6 +49,7 @@ https://satijalab.org/signac/articles/pbmc_vignette.html
 
 ## this seurat object was created using the using 
 ## https://github.com/michaelcvermeulen/microglia-loss-of-y/blob/main/scripts/Preprocessing_multi_modal.R
+## Supplemental_Code_S1 - Preprocessing_multi_modal.R
 
 readRDS("e:/LOY/scLOY/data/10X_MULTIOME_LYMPH/seurat_MV.RDS") -> o
 
@@ -103,11 +109,11 @@ ggplot2::ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PL
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-### Fig 1B
+### Supp 1A
 
 DotPlot describing the clusters.
 
-```{r fig1b}
+```{r supp1a}
 
 
 factor(o@meta.data$cell_ident_MV,
@@ -133,9 +139,9 @@ ggplot2::ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PL
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-### Fig 1C
+### Fig 1B
 
-```{r fig1c}
+```{r fig1b}
 
 
 ### 3000 
@@ -170,7 +176,7 @@ tmp@meta.data[tmp$LOY=="LOY",] %>% dplyr::group_by(cell_ident_MV) %>% dplyr::sum
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-### Fig 1D
+### LOY barplot
 
 ```{r analysis_fig1d}
 
@@ -451,43 +457,9 @@ oo@meta.data[oo@meta.data$cell_ident_MV == "B tumor",] %>% dplyr::group_by(ATAC_
 ```
 
 
+### Fig 2B
 
-
-```{r PAR}
-
-
-o[["ATAC_gene_activity"]]@data -> data
-data %>% as.matrix() -> data
-data[rownames(data) %in% expressed_PAR_genes(o),] -> PAR_counts
-PAR_counts %>% colMeans() %>% as.data.frame() -> PAR
-names(PAR) <- "PAR_Access"
-left_join(x = tibble::rownames_to_column(o@meta.data,"CB"), y = tibble::rownames_to_column(PAR,"CB"), by = "CB" ) %>%
-  tibble::column_to_rownames("CB") -> o@meta.data
-
-
-subset(o, nCount_ATAC > 10000 & nFeature_ATAC > 1000) -> oo
-ggpubr::ggboxplot(oo@meta.data[oo@meta.data$cell_ident_MV=="B tumor",],
-          x = "ATAC_LOY", y = "PAR_Access", facet.by = "cell_ident_MV") + ggpubr::stat_compare_means()
-
-subset(o, nCount_RNA >= 1500 & nFeature_RNA > 1000) -> oo
-ggpubr::ggboxplot(oo@meta.data[oo@meta.data$cell_ident_MV=="B tumor",],
-          x = "LOY_levels", y = "normPAR", facet.by = "cell_ident_MV") + ggpubr::stat_compare_means()
-
-
-
-
-
-
-
-
-```
-
-
-\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
-
-### Fig 1H
-
-```{r fig1h}
+```{r figb}
 
 Idents(o) <- "LOY"
 Y <- c("RPS4Y1","ZFY","TBL1Y","USP9Y","DDX3Y","UTY","TMSB4Y","NLGN4Y","KDM5D","EIF1AY")
@@ -509,9 +481,9 @@ ggplot2::ggsave(filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/C
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-### Fig 1G
+### Fig2a
 
-```{r fig1g}
+```{r fig2a}
 
 ###### NORM ACCESS chrY as UMI threshold increases and GEX gene expression calling becomes more confident 
 
@@ -542,9 +514,9 @@ ggplot2::ggsave(plot =p, units = "in", width = 3, height = 2.5, dpi = "retina",
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-### Fig 1F
+### Fig 1EF
 
-```{r fig1f}
+```{r fig1ef}
 
 # inset boxplot (left)
 
@@ -691,34 +663,40 @@ wilcox.test(x = tmp@meta.data[tmp@meta.data$LOY == "LOY",]$Norm_Access,
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-### Supp Fig 2
+### Supp Fig 1b
 
 Supplementary Fig. 2 \| Y chromosome ATAC gene activity is exclusively repressed in LOY nuclei. LOY was classified using gene expression. Boxplots comparing LOY and non-LOY/normal nuclei chromatin accessibility-based gene activity across all chromosomes (n=3,834). Gene activity scores were calculated using genes with \> 0.2 normalized expression across all nuclei from the chromosome of interest. Boxes represent the 25th percentile, median, and 75th percentile. The whiskers extend to the furthest value that is no more than 1.5 times the inter-quartile range.
 
 ```{r S2}
 
 Seurat::DefaultAssay(o) <- "RNA"
+Idents(o) <- "LOY"
 o[["ATAC_gene_activity"]]@data -> data
 data %>% as.matrix() -> data
 edb <- EnsDb.Hsapiens.v86
 
-## only use genes that are expressed
+## only use genes that are expressed and detected in the ATAC assay
 Seurat::AverageExpression(o, group.by = "orig.ident") -> t
-t$RNA[t$RNA > 1.090402e-02,] %>% names() -> elig
+t$RNA[t$ATAC_gene_activity > 0,] %>% names() -> elig
+t$RNA[t$RNA > 0.2,] %>% names() -> elig2
 
+elig[elig %in% elig2] -> elig
 
 lapply(c(1:22,"X","Y"), function(i){
   message(i)
   edb.x <- addFilter(edb, SeqNameFilter(i))
   genes(edb.x) -> tmp
   Repitools::annoGR2DF(tmp) -> tmp
-  Seurat::AverageExpression(subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000), 
+  Seurat::AverageExpression(subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000 & nCount_ATAC >= 10000 & nFeature_ATAC >= 1000 & 
+                                     cell_ident_MV == "B tumor" ), 
                     features = tmp$gene_name) -> dat
 
   dat$ATAC_gene_activity[rownames(dat$ATAC_gene_activity) %in% elig,] %>% 
     as.data.frame() -> k
 
   k$chr <- i
+  print(paste0(i, "        ", wilcox.test(x = k$LOY, y = k$NORMAL)$p.value))
+  
   return(k)
 
 }) -> output
@@ -726,15 +704,20 @@ data.table::rbindlist(output) -> output
 
 reshape2::melt(output, id = "chr" ) -> output
 
-ggpubr::ggboxplot(output, x = "chr", y = "value", 
+ggpubr::ggboxplot(output, x = "chr", y = "value", size = 0.2, 
                   fill = "variable", outlier.shape = NA,
                   palette = c("red","grey")) + ylim(0,0.75) -> p
                   p %>% ggpar(xlab = "", ylab = "Gene activity (ATAC-seq)", 
                   legend = "none", font.xtickslab = c(8,"bold")) -> p
 
-#ggsave(plot = p, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/LOY_PROP_BAR.pdf",
-#       dpi = "retina", width = 4, height = 4, units = "in")
+ggsave(plot = p + coord_cartesian(ylim = c(0,0.5)), 
+       filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS/Fig1/Gene_activity_by_chrom_B_tumor.pdf",
+       dpi = "retina", width = 8, height = 5, units = "in")
 
+                  
+                  
+                  
+                  
 ```
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
@@ -747,7 +730,7 @@ ggpubr::ggboxplot(output, x = "chr", y = "value",
 Seurat::Idents(o) <- "LOY"
 Seurat::DefaultAssay(o) <- "ATAC"
 p1 <- Signac::CoveragePlot(
-  object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000), tile = F,
+  object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000 & nCount_ATAC > 10000 & nFeature_ATAC > 1000), tile = F,
   region = "UTY",
   features = "UTY", window = 2000,
   expression.assay = "RNA",
@@ -758,14 +741,14 @@ p1 <- Signac::CoveragePlot(
 p1
 
 if(save == T){
-ggplot2::ggsave(plot = p1, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/UTY_GENE_ACTIVITY.pdf",
-       dpi = "retina", width = 7, height = 7, units = "in")}
+ggplot2::ggsave(plot = p1, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS/Fig1/UTY_GENE_ACTIVITY.pdf",
+       dpi = "retina", width = 7, height = 6, units = "in")}
 
 #### S3B
 Seurat::Idents(o) <- "LOY"
 Seurat::DefaultAssay(o) <- "ATAC"
 p2 <- Signac::CoveragePlot(
-  object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000), tile = F,
+  object = subset(o, nCount_RNA > 1500 & nFeature_RNA > 1000 & nCount_ATAC > 10000 & nFeature_ATAC > 1000), tile = F,
   region = "ZFY",
   features = "ZFY", window = 2000,
   expression.assay = "RNA",
@@ -776,8 +759,8 @@ p2 <- Signac::CoveragePlot(
 p2
 
 if(save == T){
-ggplot2::ggsave(plot = p2, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/PLOTS/Fig1/ZFY_GENE_ACTIVITY.pdf",
-       dpi = "retina", width = 7, height = 7, units = "in")}
+ggplot2::ggsave(plot = p2, filename = "A:/Dropbox/LOY_microglia_paper/GR_RESUB/MANUSCRIPT/PLOTS/Fig1/ZFY_GENE_ACTIVITY.pdf",
+       dpi = "retina", width = 7, height = 6, units = "in")}
 
 
 
