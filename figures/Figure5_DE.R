@@ -225,6 +225,7 @@ saveRDS(l, file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/SEPT_21/GSE1
 
 
 ### BUILD HEATMAP
+# RDS DE files available in: https://github.com/michaelcvermeulen/microglia-loss-of-y/tree/main/data/DE_tables
 
 list.files(path = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/FINAL/DE/SEPT_21/", full.names = T) -> files
 lapply(files, function(x){
@@ -471,7 +472,7 @@ lapply(o@meta.data$donor %>% unique(), function(x) {
   DE1 <- run_DE_multi(s_obj = subset(o, donor == x),
                     sample = o@meta.data$donor_organism.biomaterial_core.biomaterial_id %>% unique(),
                     latent = c("nCount_RNA","nFeature_RNA","percent.rb","specific_tissue"),
-                    cell_type = c("Microglia"), logfc.threshold = 0, min.pct = 0.05)
+                    cell_type = c("Microglia"), logfc.threshold = 0, min.pct = 0.05, nUMI = 2000, nFeature = 1000)
   DE1$ID <- x
 
   annoGR2DF(genes(edb)) -> GL
@@ -508,7 +509,7 @@ lapply(o@meta.data$library_id %>% unique(), function(x) {
   DE1 <- run_DE_multi(s_obj = subset(o, library_id == x),
                       sample = o@meta.data$donor_organism.biomaterial_core.biomaterial_id %>% unique(),
                       latent = c("nCount_RNA","nFeature_RNA","percent.rb"),
-                      cell_type = c("Microglia"), nUMI = 1000, nFeature = 800, logfc.threshold = 0, min.pct = 0.05)
+                      cell_type = c("Microglia"), nUMI = 2000, nFeature = 1000, logfc.threshold = 0, min.pct = 0.05)
   DE1$ID <- x
 
   annoGR2DF(genes(edb)) -> GL
@@ -533,6 +534,7 @@ lapply(o@meta.data$library_id %>% unique(), function(x) {
   return(DE1)
 }) -> l
 
+
 saveRDS(data.table::rbindlist(l),
         file = "h:/LOY/scLOY/scLOY_NOV18/plots/MARCH_12/MANUSCRIPT/MAIN/Fig3/OLAH_DONOR_DE_LOY_MICROGLIA.RDS")
 
@@ -545,7 +547,7 @@ lapply(c("pPDsHSrSNxi1963","pPDsHSrSNxi4775","pPDsHSrSNxi3887"), function(x) {
   DE1 <- run_DE_multi(s_obj = subset(o, donor_organism.biomaterial_core.biomaterial_id == x),
                       sample = o@meta.data$donor_organism.biomaterial_core.biomaterial_id %>% unique(),
                       latent = c("nCount_RNA","nFeature_RNA","percent.rb"),
-                      cell_type = c("Microglia"), nUMI = 1000, nFeature = 800, logfc.threshold = 0, min.pct = 0.05)
+                      cell_type = c("Microglia"), nUMI = 2000, nFeature = 1000, logfc.threshold = 0, min.pct = 0.05)
   DE1$ID <- x
 
   annoGR2DF(genes(edb)) -> GL
@@ -579,12 +581,12 @@ readRDS(file = "e:/LOY/scLOY/processed_seurat/MERGED_COHORT/GSE148822_cleaned_fi
 o@meta.data$donor -> o@meta.data$donor_organism.biomaterial_core.biomaterial_id
 
 lapply(o@meta.data$donor %>% unique(), function(x) {
-
+ 
   message(x)
   DE1 <- run_DE_multi(s_obj = subset(o, donor_organism.biomaterial_core.biomaterial_id == x),
                       sample = o@meta.data$donor_organism.biomaterial_core.biomaterial_id %>% unique(),
                       latent = c("nCount_RNA","nFeature_RNA","percent.rb","specific_tissue"),
-                      cell_type = c("Microglia"), nUMI = 1000, nFeature = 800, logfc.threshold = 0, min.pct = 0.05)
+                      cell_type = c("Microglia"), nUMI = 2000, nFeature = 1000, logfc.threshold = 0, min.pct = 0.05)
   DE1$ID <- x
 
   annoGR2DF(genes(edb)) -> GL
@@ -632,7 +634,7 @@ lapply(c("GSM5550475","GSM5550481","GSM5550501","GSM5550451","GSM5550491","GSM55
   DE1 <- run_DE_multi(s_obj = o,
                       sample = c(x),
                       latent = c("nCount_RNA","nFeature_RNA","percent.rb"),
-                      cell_type = c("Microglia"), nUMI = 1000, nFeature = 800, logfc.threshold = 0, min.pct = 0.05)
+                      cell_type = c("Microglia"), nUMI = 2000, nFeature = 1000, logfc.threshold = 0, min.pct = 0.05)
   DE1$ID <- x
  
   annoGR2DF(genes(edb)) -> GL
@@ -675,7 +677,7 @@ lapply(c("GSM5106120","GSM5106119","GSM5106101","GSM5106122"), function(x) {
   DE1 <- run_DE_multi(s_obj = o,
                       sample = c(x),
                       latent = c("nCount_RNA","nFeature_RNA","percent.rb"),
-                      cell_type = c("Microglia"), nUMI = 1000, nFeature = 800, logfc.threshold = 0, min.pct = 0.05)
+                      cell_type = c("Microglia"),nUMI = 2000, nFeature = 1000, logfc.threshold = 0, min.pct = 0.05)
   DE1$ID <- x
   
   annoGR2DF(genes(edb)) -> GL
